@@ -5,24 +5,27 @@ import type { Runner } from './types.js';
 import { escapeTestNameForRegex } from './extractor.js';
 
 export function detectRunner(cwd: string): Runner {
-  const pkgPath = path.join(cwd, 'package.json');
-  if (!fs.existsSync(pkgPath)) {
+  const searchDirs = getSearchDirs(cwd);
+  if (searchDirs.length === 0) {
     throw new Error(
       `No package.json found in ${cwd}.\nRun overlapped from your project root.`,
     );
   }
 
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const allDeps = {
-    ...pkg.dependencies,
-    ...pkg.devDependencies,
-  };
+  for (const dir of searchDirs) {
+    const pkgPath = path.join(dir, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const allDeps = {
+      ...pkg.dependencies,
+      ...pkg.devDependencies,
+    };
 
-  if (allDeps.vitest || fs.existsSync(path.join(cwd, 'vitest.config.ts'))) {
-    return 'vitest';
-  }
-  if (allDeps.jest || fs.existsSync(path.join(cwd, 'jest.config.ts'))) {
-    return 'jest';
+    if (allDeps.vitest || fs.existsSync(path.join(dir, 'vitest.config.ts'))) {
+      return 'vitest';
+    }
+    if (allDeps.jest || fs.existsSync(path.join(dir, 'jest.config.ts'))) {
+      return 'jest';
+    }
   }
 
   throw new Error(
@@ -38,13 +41,36 @@ export function detectRunner(cwd: string): Runner {
 }
 
 function resolveRunnerBin(runner: Runner, cwd: string): string {
-  const binPath = path.join(cwd, 'node_modules', '.bin', runner);
-  if (!fs.existsSync(binPath)) {
-    throw new Error(
-      `${runner} not found in project dependencies.\nInstall it with: npm install -D ${runner}`,
-    );
+  const searched: string[] = [];
+  for (const dir of getSearchDirs(cwd)) {
+    const binPath = path.join(dir, 'node_modules', '.bin', runner);
+    searched.push(binPath);
+    if (fs.existsSync(binPath)) return binPath;
   }
-  return binPath;
+
+  throw new Error(
+    `${runner} not found in project dependencies.\n\n` +
+      'overlapped searched:\n' +
+      searched.map((p) => `  ${p}`).join('\n') +
+      `\n\nInstall it with: npm install -D ${runner}`,
+  );
+}
+
+function getSearchDirs(cwd: string): string[] {
+  const dirs: string[] = [];
+  let dir = cwd;
+
+  while (true) {
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      dirs.push(dir);
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  return dirs;
 }
 
 interface RunCoverageOptions {
@@ -67,7 +93,14 @@ interface RunCoverageResult {
 }
 
 function buildCommand(opts: RunCoverageOptions): string {
-  const { runner, cwd, coverageDir, project, testFile, testNamePattern } = opts;
+  const {
+    runner,
+    cwd,
+    coverageDir,
+    project,
+    testFile,
+    testNamePattern,
+  } = opts;
   const bin = resolveRunnerBin(runner, cwd);
 
   if (runner === 'vitest') {

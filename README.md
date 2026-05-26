@@ -73,6 +73,19 @@ npx overlapped analyze \
   --reference-coverage ./coverage/coverage-final.json
 ```
 
+pnpm monorepo or custom integration pattern:
+
+```bash
+pnpm vitest run "test/**/*.integration.test.ts" \
+  --coverage \
+  --coverage.reporter=json \
+  --coverage.reportsDirectory=coverage/integration
+
+npx overlapped analyze \
+  --reference-coverage ./coverage/integration/coverage-final.json \
+  --include "test/**/*.test.ts"
+```
+
 ## Prerequisites
 
 - **Node.js >= 22**
@@ -80,7 +93,7 @@ npx overlapped analyze \
 - Coverage provider configured (e.g. `@vitest/coverage-v8` for Vitest)
 - A reference suite, such as integration or e2e tests, or an existing Istanbul `coverage-final.json`
 
-`overlapped` does not call your npm scripts. It resolves the local runner binary from `node_modules/.bin/` and runs it with coverage flags pointed at a temporary `.overlapped/` directory.
+`overlapped` does not call your npm scripts. It resolves the local runner binary from the current package or a parent workspace `node_modules/.bin/`, then runs it with coverage flags pointed at a temporary `.overlapped/` directory.
 
 ## Usage
 
