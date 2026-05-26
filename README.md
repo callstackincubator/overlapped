@@ -73,15 +73,19 @@ npx overlapped analyze \
   --reference-coverage ./coverage/coverage-final.json
 ```
 
-pnpm monorepo or custom integration pattern:
+pnpm monorepo or custom reference script:
 
 ```bash
-pnpm vitest run "test/**/*.integration.test.ts" \
-  --coverage \
-  --coverage.reporter=json \
-  --coverage.reportsDirectory=coverage/integration
-
 npx overlapped analyze \
+  --reference-command 'pnpm vitest run "test/**/*.integration.test.ts" --coverage --coverage.reporter=json --coverage.reportsDirectory="$OVERLAPPED_COVERAGE_DIR"' \
+  --include "test/**/*.test.ts"
+```
+
+If your script writes coverage to a fixed path, point `overlapped` at it:
+
+```bash
+npx overlapped analyze \
+  --reference-command "npm run test:coverage" \
   --reference-coverage ./coverage/integration/coverage-final.json \
   --include "test/**/*.test.ts"
 ```
@@ -95,6 +99,8 @@ npx overlapped analyze \
 - A reference suite, such as integration or e2e tests, or an existing Istanbul `coverage-final.json`
 
 `overlapped` does not call your npm scripts. It resolves the local runner binary from the current package or a parent workspace `node_modules/.bin/`, then runs it with coverage flags pointed at a temporary `.overlapped/` directory.
+
+The exception is `--reference-command`, which is only for generating baseline coverage. Per-test analysis still uses the local Vitest/Jest binary directly so `overlapped` can run one test file and one test name at a time.
 
 ## Usage
 
@@ -114,6 +120,7 @@ Always review changes with `--dry-run` first.
 |---|---|---|
 | `--runner <vitest\|jest>` | Test runner | auto-detected |
 | `--reference <name>` | Reference suite project or config name | — |
+| `--reference-command <command>` | Command that generates reference coverage | — |
 | `--reference-coverage <path>` | Path to existing `coverage-final.json` | — |
 | `--unit <name>` | Unit test suite project or config name | — |
 | `--include <glob>` | Unit test file pattern (repeatable) | common `src/`, `test/`, and `tests/` `.test.ts` / `.spec.ts` patterns |

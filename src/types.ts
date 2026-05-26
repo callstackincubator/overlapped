@@ -33,6 +33,7 @@ export type Runner = 'vitest' | 'jest';
 export interface OverlappedConfig {
   runner: Runner;
   referenceProject?: string;
+  referenceCommand?: string;
   referenceCoverage?: string;
   unitProject?: string;
   unitInclude: string[];

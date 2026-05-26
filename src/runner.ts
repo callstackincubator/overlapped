@@ -92,6 +92,14 @@ interface RunCoverageResult {
   error?: Error;
 }
 
+interface RunCommandResult {
+  ok: boolean;
+  command: string;
+  stdout: string;
+  stderr: string;
+  error?: Error;
+}
+
 function buildCommand(opts: RunCoverageOptions): string {
   const {
     runner,
@@ -151,5 +159,33 @@ export function runCoverage(opts: RunCoverageOptions): Promise<RunCoverageResult
         error: error ?? undefined,
       });
     });
+  });
+}
+
+export function runCommand(
+  command: string,
+  cwd: string,
+  env: Record<string, string>,
+): Promise<RunCommandResult> {
+  return new Promise((resolve) => {
+    exec(
+      command,
+      {
+        cwd,
+        env: {
+          ...process.env,
+          ...env,
+        },
+      },
+      (error, stdout, stderr) => {
+        resolve({
+          ok: !error,
+          command,
+          stdout,
+          stderr,
+          error: error ?? undefined,
+        });
+      },
+    );
   });
 }

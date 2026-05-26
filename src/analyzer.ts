@@ -8,7 +8,7 @@ import {
   checkSubsumption,
 } from './coverage.js';
 import { extractTests } from './extractor.js';
-import { runCoverage } from './runner.js';
+import { runCommand, runCoverage } from './runner.js';
 
 export async function analyze(
   config: OverlappedConfig,
@@ -17,7 +17,40 @@ export async function analyze(
   // Phase 1: Load or generate reference coverage
   let refFp: Set<string>;
 
-  if (config.referenceCoverage) {
+  if (config.referenceCommand) {
+    const refCoverageDir = path.join(cwd, '.overlapped', 'reference');
+    fs.mkdirSync(refCoverageDir, { recursive: true });
+
+    process.stderr.write('Running reference command with coverage...\n');
+    const refRun = await runCommand(config.referenceCommand, cwd, {
+      OVERLAPPED_COVERAGE_DIR: refCoverageDir,
+    });
+
+    if (!refRun.ok) {
+      throw new Error(
+        'Reference command failed.\n\n' +
+          `Command attempted:\n  ${refRun.command}\n\n` +
+          referenceCommandHint(refCoverageDir, config.referenceCoverage, refRun.stderr),
+      );
+    }
+
+    const refCoverageFile = findReferenceCoverageFile(
+      cwd,
+      refCoverageDir,
+      config.referenceCoverage,
+    );
+
+    if (!refCoverageFile) {
+      throw new Error(
+        'Reference command did not produce coverage.\n\n' +
+          `Command attempted:\n  ${refRun.command}\n\n` +
+          referenceCommandHint(refCoverageDir, config.referenceCoverage, refRun.stderr),
+      );
+    }
+
+    const refMap = loadCoverageFile(refCoverageFile);
+    refFp = buildFingerprint(refMap);
+  } else if (config.referenceCoverage) {
     process.stderr.write('Loading reference coverage...\n');
     const refMap = loadCoverageFile(path.resolve(cwd, config.referenceCoverage));
     refFp = buildFingerprint(refMap);
@@ -163,6 +196,48 @@ export async function analyze(
   fs.rmSync(path.join(cwd, '.overlapped'), { recursive: true, force: true });
 
   return results;
+}
+
+function findReferenceCoverageFile(
+  cwd: string,
+  refCoverageDir: string,
+  configuredPath: string | undefined,
+): string | null {
+  const candidates = configuredPath
+    ? [path.resolve(cwd, configuredPath)]
+    : [
+        path.join(refCoverageDir, 'coverage-final.json'),
+        path.join(cwd, 'coverage', 'coverage-final.json'),
+      ];
+
+  return candidates.find((file) => fs.existsSync(file)) ?? null;
+}
+
+function referenceCommandHint(
+  refCoverageDir: string,
+  configuredPath: string | undefined,
+  stderr: string,
+): string {
+  const expected = configuredPath
+    ? [`  ${configuredPath}`]
+    : [
+        `  ${path.join(refCoverageDir, 'coverage-final.json')}`,
+        '  coverage/coverage-final.json',
+      ];
+  const lines = [
+    'Expected coverage file:',
+    ...expected,
+    '',
+    'When using --reference-command, either:',
+    '  - write coverage to $OVERLAPPED_COVERAGE_DIR/coverage-final.json',
+    '  - or pass --reference-coverage <path> pointing at the command output',
+  ];
+
+  if (stderr.trim()) {
+    lines.push('', 'Runner stderr:', indent(stderr.trim()));
+  }
+
+  return lines.join('\n');
 }
 
 function coverageFailureHint(

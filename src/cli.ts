@@ -24,6 +24,7 @@ const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is ful
 \x1b[1mOptions:\x1b[0m
   --runner <vitest|jest>          Test runner (auto-detected by default)
   --reference <name>              Reference suite project/config name
+  --reference-command <command>   Command that generates reference coverage
   --reference-coverage <path>     Path to a pre-generated coverage-final.json
   --unit <name>                   Unit test suite project/config name
   --include <glob>                Unit test file pattern (repeatable)
@@ -41,6 +42,7 @@ function main(): void {
       options: {
         runner: { type: 'string' },
         reference: { type: 'string' },
+        'reference-command': { type: 'string' },
         'reference-coverage': { type: 'string' },
         unit: { type: 'string' },
         include: { type: 'string', multiple: true },
@@ -92,6 +94,7 @@ function buildConfig(
   values: {
     runner?: string;
     reference?: string;
+    'reference-command'?: string;
     'reference-coverage'?: string;
     unit?: string;
     include?: string[];
@@ -103,6 +106,7 @@ function buildConfig(
   return {
     runner: parseRunner(values.runner, cwd),
     referenceProject: values.reference,
+    referenceCommand: values['reference-command'],
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
     unitInclude: values.include ?? DEFAULT_UNIT_INCLUDE,
