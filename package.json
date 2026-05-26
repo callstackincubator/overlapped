@@ -1,0 +1,35 @@
+{
+  "name": "ovelapped",
+  "version": "0.1.0",
+  "description": "Find unit tests whose coverage is fully subsumed by integration tests",
+  "type": "module",
+  "bin": {
+    "ovelapped": "bin/ovelapped.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "coverage",
+    "testing",
+    "vitest",
+    "jest",
+    "deduplication",
+    "overlap"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "^5.8"
+  }
+}
