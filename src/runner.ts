@@ -57,6 +57,15 @@ interface RunCoverageOptions {
   timeout?: number;
 }
 
+interface RunCoverageResult {
+  ok: boolean;
+  command: string;
+  coverageFile: string;
+  stdout: string;
+  stderr: string;
+  error?: Error;
+}
+
 function buildCommand(opts: RunCoverageOptions): string {
   const { runner, cwd, coverageDir, project, testFile, testNamePattern } = opts;
   const bin = resolveRunnerBin(runner, cwd);
@@ -93,14 +102,21 @@ function buildCommand(opts: RunCoverageOptions): string {
   return parts.join(' ');
 }
 
-export function runCoverage(opts: RunCoverageOptions): Promise<boolean> {
+export function runCoverage(opts: RunCoverageOptions): Promise<RunCoverageResult> {
   const cmd = buildCommand(opts);
   const timeout = opts.timeout ?? 120_000;
 
   return new Promise((resolve) => {
-    exec(cmd, { cwd: opts.cwd, timeout }, () => {
+    exec(cmd, { cwd: opts.cwd, timeout }, (error, stdout, stderr) => {
       const covFile = path.join(opts.coverageDir, 'coverage-final.json');
-      resolve(fs.existsSync(covFile));
+      resolve({
+        ok: fs.existsSync(covFile),
+        command: cmd,
+        coverageFile: covFile,
+        stdout,
+        stderr,
+        error: error ?? undefined,
+      });
     });
   });
 }

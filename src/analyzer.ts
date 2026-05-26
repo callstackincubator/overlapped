@@ -26,17 +26,19 @@ export async function analyze(
     fs.mkdirSync(refCoverageDir, { recursive: true });
 
     process.stderr.write('Running reference suite with coverage...\n');
-    const refOk = await runCoverage({
+    const refRun = await runCoverage({
       runner: config.runner,
       cwd,
       coverageDir: refCoverageDir,
       project: config.referenceProject,
     });
 
-    if (!refOk) {
+    if (!refRun.ok) {
       throw new Error(
-        'Reference suite did not produce coverage.\n' +
-          'Make sure your test runner has coverage enabled (e.g. @vitest/coverage-v8 or jest --coverage).',
+        'Reference suite did not produce coverage.\n\n' +
+          `Command attempted:\n  ${refRun.command}\n\n` +
+          `Expected coverage file:\n  ${refRun.coverageFile}\n\n` +
+          coverageFailureHint(config.referenceProject, config.runner, refRun.stderr),
       );
     }
 
@@ -89,7 +91,7 @@ export async function analyze(
       fs.mkdirSync(covDir, { recursive: true });
 
       try {
-        const ok = await runCoverage({
+        const run = await runCoverage({
           runner: config.runner,
           cwd,
           coverageDir: covDir,
@@ -99,7 +101,7 @@ export async function analyze(
           timeout: 60_000,
         });
 
-        if (!ok) {
+        if (!run.ok) {
           return {
             test,
             status: 'error' as const,
@@ -107,7 +109,7 @@ export async function analyze(
             uniqueBranches: 0,
             totalStatements: 0,
             totalBranches: 0,
-            error: 'No coverage produced',
+            error: `No coverage produced. Command attempted: ${run.command}`,
           };
         }
 
@@ -161,6 +163,46 @@ export async function analyze(
   fs.rmSync(path.join(cwd, '.overlapped'), { recursive: true, force: true });
 
   return results;
+}
+
+function coverageFailureHint(
+  referenceProject: string | undefined,
+  runner: string,
+  stderr: string,
+): string {
+  const lines = [
+    `${runner} was found and overlapped did pass coverage flags.`,
+    'The command either failed before writing coverage, or the runner wrote coverage somewhere else.',
+    '',
+    'Common fixes:',
+  ];
+
+  if (!referenceProject) {
+    lines.push(
+      '  - Pass the suite to use as the baseline, for example: --reference integration',
+      '  - Or skip running the reference suite with: --reference-coverage ./coverage/coverage-final.json',
+    );
+  }
+
+  lines.push(
+    '  - For Vitest, install/configure a coverage provider such as @vitest/coverage-v8.',
+    '  - For Jest, make sure coverage can run and produce coverage-final.json.',
+    '  - Run the command above directly to see the full runner failure.',
+  );
+
+  if (stderr.trim()) {
+    lines.push('', 'Runner stderr:', indent(stderr.trim()));
+  }
+
+  return lines.join('\n');
+}
+
+function indent(text: string): string {
+  return text
+    .split('\n')
+    .slice(-12)
+    .map((line) => `  ${line}`)
+    .join('\n');
 }
 
 function findTestFiles(cwd: string, patterns: string[]): string[] {

@@ -77,7 +77,10 @@ npx overlapped analyze \
 
 - **Node.js >= 22**
 - **vitest** or **jest** installed in your project
-- Coverage provider configured (e.g. `@vitest/coverage-v8` for vitest)
+- Coverage provider configured (e.g. `@vitest/coverage-v8` for Vitest)
+- A reference suite, such as integration or e2e tests, or an existing Istanbul `coverage-final.json`
+
+`overlapped` does not call your npm scripts. It resolves the local runner binary from `node_modules/.bin/` and runs it with coverage flags pointed at a temporary `.overlapped/` directory.
 
 ## Usage
 
