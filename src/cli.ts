@@ -26,40 +26,73 @@ const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is ful
 `;
 
 function main(): void {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    options: {
-      runner: { type: 'string' },
-      reference: { type: 'string' },
-      'reference-coverage': { type: 'string' },
-      unit: { type: 'string' },
-      include: { type: 'string', multiple: true },
-      concurrency: { type: 'string' },
-      report: { type: 'string' },
-      'dry-run': { type: 'boolean', default: false },
-      help: { type: 'boolean', short: 'h', default: false },
-      version: { type: 'boolean', short: 'v', default: false },
-    },
-  });
+  try {
+    const { values, positionals } = parseArgs({
+      allowPositionals: true,
+      options: {
+        runner: { type: 'string' },
+        reference: { type: 'string' },
+        'reference-coverage': { type: 'string' },
+        unit: { type: 'string' },
+        include: { type: 'string', multiple: true },
+        concurrency: { type: 'string' },
+        report: { type: 'string' },
+        'dry-run': { type: 'boolean', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+        version: { type: 'boolean', short: 'v', default: false },
+      },
+    });
 
-  if (values.version) {
-    const pkg = JSON.parse(
-      fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-    );
-    console.log(pkg.version);
-    return;
+    if (values.version) {
+      const pkg = JSON.parse(
+        fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+      );
+      console.log(pkg.version);
+      return;
+    }
+
+    if (values.help || positionals.length === 0) {
+      console.log(HELP);
+      return;
+    }
+
+    const command = positionals[0];
+    const cwd = process.cwd();
+
+    if (command === 'analyze') {
+      runAnalyze(buildConfig(values, cwd), cwd);
+    } else if (command === 'prune') {
+      runPrune(
+        {
+          reportPath: values.report ?? 'overlapped-report.json',
+        },
+        values['dry-run'] ?? false,
+      );
+    } else {
+      console.error(`Unknown command: ${command}\n`);
+      console.log(HELP);
+      process.exitCode = 1;
+    }
+  } catch (err) {
+    printError(err as Error);
+    process.exitCode = 1;
   }
+}
 
-  if (values.help || positionals.length === 0) {
-    console.log(HELP);
-    return;
-  }
-
-  const command = positionals[0];
-  const cwd = process.cwd();
-
-  const config: OverlappedConfig = {
-    runner: (values.runner as 'vitest' | 'jest') ?? detectRunner(cwd),
+function buildConfig(
+  values: {
+    runner?: string;
+    reference?: string;
+    'reference-coverage'?: string;
+    unit?: string;
+    include?: string[];
+    concurrency?: string;
+    report?: string;
+  },
+  cwd: string,
+): OverlappedConfig {
+  return {
+    runner: parseRunner(values.runner, cwd),
     referenceProject: values.reference,
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
@@ -67,16 +100,20 @@ function main(): void {
     concurrency: parseInt(values.concurrency ?? '8', 10),
     reportPath: values.report ?? 'overlapped-report.json',
   };
+}
 
-  if (command === 'analyze') {
-    runAnalyze(config, cwd);
-  } else if (command === 'prune') {
-    runPrune(config, values['dry-run'] ?? false);
-  } else {
-    console.error(`Unknown command: ${command}\n`);
-    console.log(HELP);
-    process.exitCode = 1;
+function parseRunner(value: string | undefined, cwd: string): 'vitest' | 'jest' {
+  if (value === 'vitest' || value === 'jest') return value;
+  if (value) {
+    throw new Error(
+      `Unsupported runner: ${value}\nPass --runner vitest or --runner jest.`,
+    );
   }
+  return detectRunner(cwd);
+}
+
+function printError(err: Error): void {
+  console.error(`\n\x1b[31mError:\x1b[0m ${err.message}`);
 }
 
 async function runAnalyze(
@@ -90,13 +127,13 @@ async function runAnalyze(
     printSummary(report);
     console.log(`\nReport written to ${config.reportPath}`);
   } catch (err) {
-    console.error(`\n\x1b[31mError:\x1b[0m ${(err as Error).message}`);
+    printError(err as Error);
     process.exitCode = 1;
   }
 }
 
 async function runPrune(
-  config: OverlappedConfig,
+  config: Pick<OverlappedConfig, 'reportPath'>,
   dryRun: boolean,
 ): Promise<void> {
   if (!fs.existsSync(config.reportPath)) {

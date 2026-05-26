@@ -26,7 +26,14 @@ export function detectRunner(cwd: string): Runner {
   }
 
   throw new Error(
-    'Could not detect test runner. Install vitest or jest, or pass --runner.',
+    'Could not detect a test runner in this project.\n\n' +
+      'overlapped looks for vitest or jest in dependencies, devDependencies, or common config files.\n\n' +
+      'Try one of these:\n' +
+      '  overlapped analyze --runner vitest\n' +
+      '  overlapped analyze --runner jest\n\n' +
+      'If this project has no local runner yet, install one first:\n' +
+      '  npm install -D vitest @vitest/coverage-v8\n' +
+      '  npm install -D jest',
   );
 }
 
