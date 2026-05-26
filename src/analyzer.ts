@@ -1,8 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import type { AnalysisResult, OvelappedConfig, TestEntry } from './types.js';
-import { loadCoverageMap, buildFingerprint, checkSubsumption } from './coverage.js';
+import {
+  loadCoverageMap,
+  loadCoverageFile,
+  buildFingerprint,
+  checkSubsumption,
+} from './coverage.js';
 import { extractTests } from './extractor.js';
 import { runCoverage } from './runner.js';
 
@@ -10,27 +14,36 @@ export async function analyze(
   config: OvelappedConfig,
   cwd: string,
 ): Promise<AnalysisResult[]> {
-  const refCoverageDir = path.join(cwd, '.ovelapped', 'reference');
-  fs.mkdirSync(refCoverageDir, { recursive: true });
+  // Phase 1: Load or generate reference coverage
+  let refFp: Set<string>;
 
-  // Phase 1: Run reference suite
-  process.stderr.write('Running reference suite with coverage...\n');
+  if (config.referenceCoverage) {
+    process.stderr.write('Loading reference coverage...\n');
+    const refMap = loadCoverageFile(path.resolve(cwd, config.referenceCoverage));
+    refFp = buildFingerprint(refMap);
+  } else {
+    const refCoverageDir = path.join(cwd, '.ovelapped', 'reference');
+    fs.mkdirSync(refCoverageDir, { recursive: true });
 
-  const refOk = await runCoverage({
-    runner: config.runner,
-    cwd,
-    coverageDir: refCoverageDir,
-    project: config.referenceProject,
-  });
+    process.stderr.write('Running reference suite with coverage...\n');
+    const refOk = await runCoverage({
+      runner: config.runner,
+      cwd,
+      coverageDir: refCoverageDir,
+      project: config.referenceProject,
+    });
 
-  if (!refOk) {
-    throw new Error(
-      'Reference suite did not produce coverage. Check that coverage is configured.',
-    );
+    if (!refOk) {
+      throw new Error(
+        'Reference suite did not produce coverage.\n' +
+          'Make sure your test runner has coverage enabled (e.g. @vitest/coverage-v8 or jest --coverage).',
+      );
+    }
+
+    const refMap = loadCoverageMap(refCoverageDir);
+    refFp = buildFingerprint(refMap);
   }
 
-  const refMap = loadCoverageMap(refCoverageDir);
-  const refFp = buildFingerprint(refMap);
   const refStmts = [...refFp].filter((k) => k.includes(':s:')).length;
   const refBranches = [...refFp].filter((k) => k.includes(':b:')).length;
   process.stderr.write(
@@ -41,10 +54,23 @@ export async function analyze(
   process.stderr.write('\nDiscovering unit tests...\n');
 
   const testFiles = findTestFiles(cwd, config.unitInclude);
+  if (testFiles.length === 0) {
+    throw new Error(
+      `No test files found matching: ${config.unitInclude.join(', ')}\n` +
+        'Use --include to specify a different pattern.',
+    );
+  }
+
   const allTests: TestEntry[] = [];
   for (const file of testFiles) {
     const tests = extractTests(file);
     allTests.push(...tests);
+  }
+
+  if (allTests.length === 0) {
+    throw new Error(
+      `Found ${testFiles.length} test files but no test() or it() calls inside them.`,
+    );
   }
 
   process.stderr.write(

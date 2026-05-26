@@ -13,15 +13,16 @@ const HELP = `\x1b[1movelapped\x1b[0m — find unit tests whose coverage is full
   ovelapped prune   [options]    Remove redundant tests from source files
 
 \x1b[1mOptions:\x1b[0m
-  --runner <vitest|jest>     Test runner (auto-detected by default)
-  --reference <name>         Reference suite (vitest project name or jest config)
-  --unit <name>              Unit test suite (vitest project name or jest config)
-  --include <glob>           Unit test file pattern (default: src/**/*.test.ts)
-  --concurrency <n>          Parallel test runs (default: 8)
-  --report <path>            Report path (default: ovelapped-report.json)
-  --dry-run                  Show what would be removed without modifying files
-  --help                     Show this help
-  --version                  Show version
+  --runner <vitest|jest>          Test runner (auto-detected by default)
+  --reference <name>              Reference suite project/config name
+  --reference-coverage <path>     Path to a pre-generated coverage-final.json
+  --unit <name>                   Unit test suite project/config name
+  --include <glob>                Unit test file pattern (default: src/**/*.test.ts)
+  --concurrency <n>               Parallel test runs (default: 8)
+  --report <path>                 Report path (default: ovelapped-report.json)
+  --dry-run                       Show what would be removed without modifying files
+  --help                          Show this help
+  --version                       Show version
 `;
 
 function main(): void {
@@ -30,6 +31,7 @@ function main(): void {
     options: {
       runner: { type: 'string' },
       reference: { type: 'string' },
+      'reference-coverage': { type: 'string' },
       unit: { type: 'string' },
       include: { type: 'string', multiple: true },
       concurrency: { type: 'string' },
@@ -59,6 +61,7 @@ function main(): void {
   const config: OvelappedConfig = {
     runner: (values.runner as 'vitest' | 'jest') ?? detectRunner(cwd),
     referenceProject: values.reference,
+    referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
     unitInclude: values.include ?? ['src/**/*.test.ts'],
     concurrency: parseInt(values.concurrency ?? '8', 10),
@@ -76,15 +79,26 @@ function main(): void {
   }
 }
 
-async function runAnalyze(config: OvelappedConfig, cwd: string): Promise<void> {
-  const results = await analyze(config, cwd);
-  const report = buildReport(results);
-  writeReport(report, config.reportPath);
-  printSummary(report);
-  console.log(`\nReport written to ${config.reportPath}`);
+async function runAnalyze(
+  config: OvelappedConfig,
+  cwd: string,
+): Promise<void> {
+  try {
+    const results = await analyze(config, cwd);
+    const report = buildReport(results);
+    writeReport(report, config.reportPath);
+    printSummary(report);
+    console.log(`\nReport written to ${config.reportPath}`);
+  } catch (err) {
+    console.error(`\n\x1b[31mError:\x1b[0m ${(err as Error).message}`);
+    process.exitCode = 1;
+  }
 }
 
-async function runPrune(config: OvelappedConfig, dryRun: boolean): Promise<void> {
+async function runPrune(
+  config: OvelappedConfig,
+  dryRun: boolean,
+): Promise<void> {
   if (!fs.existsSync(config.reportPath)) {
     console.error(
       `Report not found: ${config.reportPath}\nRun \`ovelapped analyze\` first.`,
@@ -95,9 +109,14 @@ async function runPrune(config: OvelappedConfig, dryRun: boolean): Promise<void>
 
   const report = JSON.parse(fs.readFileSync(config.reportPath, 'utf8'));
 
-  // Reconstruct AnalysisResult-like objects from the report
   const results = report.results.map(
-    (r: { file: string; name: string; status: string; uniqueStatements: number; uniqueBranches: number }) => ({
+    (r: {
+      file: string;
+      name: string;
+      status: string;
+      uniqueStatements: number;
+      uniqueBranches: number;
+    }) => ({
       test: {
         file: r.file,
         name: r.name,
@@ -113,7 +132,9 @@ async function runPrune(config: OvelappedConfig, dryRun: boolean): Promise<void>
     }),
   );
 
-  console.log(dryRun ? '\nDry run — no files will be modified:\n' : '\nPruning redundant tests:\n');
+  console.log(
+    dryRun ? '\nDry run — no files will be modified:\n' : '\nPruning redundant tests:\n',
+  );
 
   const { deletedFiles, editedFiles, totalTestsRemoved } = pruneTests(
     results,

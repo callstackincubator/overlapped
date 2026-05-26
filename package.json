@@ -3,18 +3,25 @@
   "version": "0.1.0",
   "description": "Find unit tests whose coverage is fully subsumed by integration tests",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
     "ovelapped": "bin/ovelapped.mjs"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "bin",
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepack": "npm run build",
+    "pack:dry-run": "npm pack --dry-run"
   },
   "engines": {
     "node": ">=22"

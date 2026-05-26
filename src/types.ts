@@ -33,7 +33,7 @@ export type Runner = 'vitest' | 'jest';
 export interface OvelappedConfig {
   runner: Runner;
   referenceProject?: string;
-  referenceCommand?: string;
+  referenceCoverage?: string;
   unitProject?: string;
   unitInclude: string[];
   concurrency: number;

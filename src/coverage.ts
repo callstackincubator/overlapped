@@ -4,6 +4,16 @@ import type { CoverageMap } from './types.js';
 
 export function loadCoverageMap(coverageDir: string): CoverageMap {
   const filePath = path.join(coverageDir, 'coverage-final.json');
+  return loadCoverageFile(filePath);
+}
+
+export function loadCoverageFile(filePath: string): CoverageMap {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(
+      `Coverage file not found: ${filePath}\n` +
+        'Run your test suite with coverage enabled first, or pass the correct path with --reference-coverage.',
+    );
+  }
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 

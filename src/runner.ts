@@ -5,9 +5,14 @@ import type { Runner } from './types.js';
 import { escapeTestNameForRegex } from './extractor.js';
 
 export function detectRunner(cwd: string): Runner {
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'),
-  );
+  const pkgPath = path.join(cwd, 'package.json');
+  if (!fs.existsSync(pkgPath)) {
+    throw new Error(
+      `No package.json found in ${cwd}.\nRun ovelapped from your project root.`,
+    );
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const allDeps = {
     ...pkg.dependencies,
     ...pkg.devDependencies,
@@ -21,8 +26,18 @@ export function detectRunner(cwd: string): Runner {
   }
 
   throw new Error(
-    'Could not detect test runner. Install vitest or jest, or use --runner.',
+    'Could not detect test runner. Install vitest or jest, or pass --runner.',
   );
+}
+
+function resolveRunnerBin(runner: Runner, cwd: string): string {
+  const binPath = path.join(cwd, 'node_modules', '.bin', runner);
+  if (!fs.existsSync(binPath)) {
+    throw new Error(
+      `${runner} not found in project dependencies.\nInstall it with: npm install -D ${runner}`,
+    );
+  }
+  return binPath;
 }
 
 interface RunCoverageOptions {
@@ -36,10 +51,11 @@ interface RunCoverageOptions {
 }
 
 function buildCommand(opts: RunCoverageOptions): string {
-  const { runner, coverageDir, project, testFile, testNamePattern } = opts;
+  const { runner, cwd, coverageDir, project, testFile, testNamePattern } = opts;
+  const bin = resolveRunnerBin(runner, cwd);
 
   if (runner === 'vitest') {
-    const parts = ['npx vitest run'];
+    const parts = [bin, 'run'];
     if (project) parts.push(`--project ${project}`);
     if (testFile) parts.push(`"${testFile}"`);
     if (testNamePattern) {
@@ -56,8 +72,7 @@ function buildCommand(opts: RunCoverageOptions): string {
     return parts.join(' ');
   }
 
-  // jest
-  const parts = ['npx jest'];
+  const parts = [bin];
   if (project) parts.push(`--config ${project}`);
   if (testFile) parts.push(`"${testFile}"`);
   if (testNamePattern) {
@@ -76,7 +91,7 @@ export function runCoverage(opts: RunCoverageOptions): Promise<boolean> {
   const timeout = opts.timeout ?? 120_000;
 
   return new Promise((resolve) => {
-    exec(cmd, { cwd: opts.cwd, timeout }, (error) => {
+    exec(cmd, { cwd: opts.cwd, timeout }, () => {
       const covFile = path.join(opts.coverageDir, 'coverage-final.json');
       resolve(fs.existsSync(covFile));
     });
