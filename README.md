@@ -1,28 +1,20 @@
-<p align="center">
-  <a href="https://callstack.com/open-source/?utm_source=github.com&utm_medium=referral&utm_campaign=ovelapped&utm_term=readme">
-    <img alt="ovelapped" src="https://callstack.com/images/open-source/callstack-open-source.svg" width="300" />
-  </a>
-</p>
-
----
-
 # ovelapped
-
-Find unit tests whose coverage is fully subsumed by integration tests.
 
 Find the unit tests your AI agent wrote twice.
 
 ## Overview
 
-`ovelapped` analyzes your test suite to find unit tests that don't cover anything your integration tests don't already cover. It runs each unit test in isolation, compares its coverage fingerprint against a reference suite (e.g. integration or e2e tests), and reports which tests are redundant.
+`ovelapped` finds unit tests that add no coverage beyond a reference suite, such as integration, e2e, or provider tests.
 
-Supports **vitest** and **jest** out of the box — the runner is auto-detected from your project dependencies.
+It runs each candidate unit test in isolation, compares its statement and branch coverage against the reference coverage, and reports tests that cover nothing new.
 
-Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep only the tests that add coverage signal.
+Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep the tests that still carry signal.
+
+Supports **vitest** and **jest** out of the box. The runner is auto-detected from your project dependencies.
 
 ## Real-World Cleanup
 
-In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `ovelapped` was used to audit a large AI-assisted test suite against provider-integration coverage.
+In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `ovelapped` audited a large AI-assisted unit suite against provider-integration coverage.
 
 | Metric | Before | After |
 |---|---:|---:|
@@ -35,31 +27,36 @@ In [callstackincubator/agent-device#595](https://github.com/callstackincubator/a
 | Branch coverage | 71.94% | 71.96% |
 | Line coverage | 84.49% | 84.5% |
 
-The important bit: all removed tests covered only statements and branches already covered by integration tests. The suite got smaller without losing coverage.
+Every removed test covered only statements and branches that the integration suite already covered. Smaller suite, same coverage signal.
 
 ## Quick Start
 
-Compare default unit tests against a reference suite:
+Compare a unit suite against the suite that already gives you confidence:
 
 ```bash
-npx ovelapped analyze
+npx ovelapped analyze \
+  --reference integration \
+  --unit unit \
+  --include "src/**/*.test.ts"
 ```
 
-This will:
-
-1. Run your reference test suite with coverage
-2. Discover and run each unit test in isolation
-3. Compare coverage fingerprints at statement and branch level
-4. Write a JSON report to `ovelapped-report.json`
-
-To remove the redundant tests:
+Review `ovelapped-report.json`, then preview removals:
 
 ```bash
-npx ovelapped prune --dry-run    # preview changes
-npx ovelapped prune              # apply changes
+npx ovelapped prune --dry-run
 ```
 
-For a Vitest workspace with named projects, like the agent-device cleanup:
+Apply the cleanup when the preview looks right:
+
+```bash
+npx ovelapped prune
+```
+
+Then run your full test suite with coverage and confirm thresholds still pass.
+
+## Common Setups
+
+Vitest workspace with named projects, like the agent-device cleanup:
 
 ```bash
 npx ovelapped analyze \
@@ -69,13 +66,12 @@ npx ovelapped analyze \
   --include "src/**/*.test.ts"
 ```
 
-Recommended cleanup loop:
+Existing reference coverage:
 
-1. Run `ovelapped analyze`.
-2. Review `ovelapped-report.json`.
-3. Run `ovelapped prune --dry-run`.
-4. Apply with `ovelapped prune`.
-5. Run your full test suite with coverage and confirm thresholds still pass.
+```bash
+npx ovelapped analyze \
+  --reference-coverage ./coverage/coverage-final.json
+```
 
 ## Prerequisites
 
@@ -87,19 +83,11 @@ Recommended cleanup loop:
 
 ### `ovelapped analyze`
 
-Runs the full analysis. By default it executes your reference suite to generate coverage, then runs each discovered unit test individually.
-
-Use `--reference` for the integration, e2e, or provider suite that should act as the coverage baseline. Use `--unit` for the suite containing candidate tests to remove.
-
-If you already have a `coverage-final.json` from a prior run, skip the reference suite:
-
-```bash
-ovelapped analyze --reference-coverage ./coverage/coverage-final.json
-```
+Builds the redundancy report. Use `--reference` for the suite that acts as the coverage baseline, and `--unit` for the suite containing candidate tests to remove.
 
 ### `ovelapped prune`
 
-Reads the analysis report and removes subsumed tests from source files. Files where all tests are subsumed are deleted entirely; files with a mix get individual test blocks removed.
+Reads the report and removes redundant tests. Files where every test is redundant are deleted entirely; mixed files get individual test blocks removed.
 
 Always review changes with `--dry-run` first.
 
@@ -118,10 +106,11 @@ Always review changes with `--dry-run` first.
 
 ## How It Works
 
-1. **Reference fingerprint** — Runs (or loads) coverage for the reference suite. Each covered statement and branch becomes a key in a `Set<string>` (e.g. `"/src/foo.ts:s:3"`, `"/src/foo.ts:b:1:0"`).
-2. **Per-test fingerprint** — Runs each unit test in isolation with coverage, building the same fingerprint.
-3. **Subsumption check** — If every key in a test's fingerprint exists in the reference fingerprint, the test is *subsumed* — it exercises no code path that the reference suite doesn't already cover.
-4. **Pruning** — Removes subsumed test blocks from source files using bracket-matching (no AST required).
+1. Runs or loads Istanbul `coverage-final.json` for the reference suite.
+2. Runs each candidate unit test in isolation with coverage.
+3. Turns covered statements and branches into fingerprint keys, such as `"/src/foo.ts:s:3"` and `"/src/foo.ts:b:1:0"`.
+4. Marks a test redundant only when every key in its fingerprint already exists in the reference fingerprint.
+5. Removes redundant test blocks with bracket matching. No AST, no runtime dependencies, no guesswork.
 
 ## License
 
