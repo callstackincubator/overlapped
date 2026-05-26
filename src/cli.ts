@@ -103,7 +103,7 @@ function buildConfig(
   },
   cwd: string,
 ): OverlappedConfig {
-  return {
+  const config = {
     runner: parseRunner(values.runner, cwd),
     referenceProject: values.reference,
     referenceCommand: values['reference-command'],
@@ -113,6 +113,32 @@ function buildConfig(
     concurrency: parseInt(values.concurrency ?? '8', 10),
     reportPath: values.report ?? 'overlapped-report.json',
   };
+
+  validateConfig(config);
+  return config;
+}
+
+function validateConfig(config: OverlappedConfig): void {
+  if (
+    !config.referenceProject &&
+    !config.referenceCommand &&
+    !config.referenceCoverage
+  ) {
+    throw new Error(
+      'Reference suite is required.\n\n' +
+        'Running without a reference would compare candidate tests against a suite that may include those same tests, producing false positives.\n\n' +
+        'Use one of these:\n' +
+        '  overlapped analyze --reference <project-or-config>\n' +
+        '  overlapped analyze --reference-command "npm run test:coverage"\n' +
+        '  overlapped analyze --reference-coverage ./coverage/coverage-final.json',
+    );
+  }
+
+  if (config.referenceProject && config.referenceCommand) {
+    throw new Error(
+      'Use either --reference or --reference-command, not both.',
+    );
+  }
 }
 
 function parseRunner(value: string | undefined, cwd: string): 'vitest' | 'jest' {

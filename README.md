@@ -106,7 +106,7 @@ The exception is `--reference-command`, which is only for generating baseline co
 
 ### `overlapped analyze`
 
-Builds the redundancy report. Use `--reference` for the suite that acts as the coverage baseline, and `--unit` for the suite containing candidate tests to remove.
+Builds the redundancy report. A reference is required: use `--reference`, `--reference-command`, or `--reference-coverage` for the suite that acts as the coverage baseline. Use `--unit` for the suite containing candidate tests to remove.
 
 ### `overlapped prune`
 
