@@ -116,7 +116,7 @@ Always review changes with `--dry-run` first.
 | `--reference <name>` | Reference suite project or config name | — |
 | `--reference-coverage <path>` | Path to existing `coverage-final.json` | — |
 | `--unit <name>` | Unit test suite project or config name | — |
-| `--include <glob>` | Unit test file pattern (repeatable) | `src/**/*.test.ts` |
+| `--include <glob>` | Unit test file pattern (repeatable) | common `src/`, `test/`, and `tests/` `.test.ts` / `.spec.ts` patterns |
 | `--concurrency <n>` | Parallel test runs | `8` |
 | `--report <path>` | Report output path | `overlapped-report.json` |
 | `--dry-run` | Preview prune without modifying files | `false` |

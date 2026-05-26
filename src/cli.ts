@@ -6,6 +6,15 @@ import { analyze } from './analyzer.js';
 import { buildReport, writeReport, printSummary } from './reporter.js';
 import { pruneTests } from './pruner.js';
 
+const DEFAULT_UNIT_INCLUDE = [
+  'src/**/*.test.ts',
+  'src/**/*.spec.ts',
+  'test/**/*.test.ts',
+  'test/**/*.spec.ts',
+  'tests/**/*.test.ts',
+  'tests/**/*.spec.ts',
+];
+
 const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is fully subsumed by integration tests
 
 \x1b[1mUsage:\x1b[0m
@@ -17,7 +26,7 @@ const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is ful
   --reference <name>              Reference suite project/config name
   --reference-coverage <path>     Path to a pre-generated coverage-final.json
   --unit <name>                   Unit test suite project/config name
-  --include <glob>                Unit test file pattern (default: src/**/*.test.ts)
+  --include <glob>                Unit test file pattern (repeatable)
   --concurrency <n>               Parallel test runs (default: 8)
   --report <path>                 Report path (default: overlapped-report.json)
   --dry-run                       Show what would be removed without modifying files
@@ -96,7 +105,7 @@ function buildConfig(
     referenceProject: values.reference,
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
-    unitInclude: values.include ?? ['src/**/*.test.ts'],
+    unitInclude: values.include ?? DEFAULT_UNIT_INCLUDE,
     concurrency: parseInt(values.concurrency ?? '8', 10),
     reportPath: values.report ?? 'overlapped-report.json',
   };
