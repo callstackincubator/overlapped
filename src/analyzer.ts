@@ -88,7 +88,7 @@ export async function analyze(
   // Phase 2: Discover unit tests
   process.stderr.write('\nDiscovering unit tests...\n');
 
-  const testFiles = findTestFiles(cwd, config.unitInclude);
+  const testFiles = findTestFiles(cwd, config.unitInclude, config.unitExclude);
   if (testFiles.length === 0) {
     throw new Error(
       `No test files found matching: ${config.unitInclude.join(', ')}\n` +
@@ -287,11 +287,24 @@ function indent(text: string): string {
     .join('\n');
 }
 
-function findTestFiles(cwd: string, patterns: string[]): string[] {
+function findTestFiles(
+  cwd: string,
+  patterns: string[],
+  excludePatterns: string[],
+): string[] {
   const files: string[] = [];
   for (const pattern of patterns) {
     const found = fs.globSync(pattern, { cwd });
     files.push(...found.map((f) => path.join(cwd, f)));
   }
-  return [...new Set(files)].sort();
+
+  const excluded = new Set<string>();
+  for (const pattern of excludePatterns) {
+    const found = fs.globSync(pattern, { cwd });
+    for (const file of found) {
+      excluded.add(path.join(cwd, file));
+    }
+  }
+
+  return [...new Set(files)].filter((file) => !excluded.has(file)).sort();
 }

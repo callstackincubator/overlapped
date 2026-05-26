@@ -81,6 +81,8 @@ npx overlapped analyze \
   --include "test/**/*.test.ts"
 ```
 
+If your package has an exact `test:integration` script, `overlapped analyze` uses it automatically as the reference command. Similar-looking names such as `test-integration` or `test:e2e` are not guessed.
+
 If your script writes coverage to a fixed path, point `overlapped` at it:
 
 ```bash
@@ -98,9 +100,9 @@ npx overlapped analyze \
 - For Vitest, keep `vitest` and `@vitest/coverage-v8` on the same major version
 - A reference suite, such as integration or e2e tests, or an existing Istanbul `coverage-final.json`
 
-`overlapped` does not call your npm scripts. It resolves the local runner binary from the current package or a parent workspace `node_modules/.bin/`, then runs it with coverage flags pointed at a temporary `.overlapped/` directory.
+`overlapped` does not call arbitrary npm scripts. It resolves the local runner binary from the current package or a parent workspace `node_modules/.bin/`, then runs it with coverage flags pointed at a temporary `.overlapped/` directory.
 
-The exception is `--reference-command`, which is only for generating baseline coverage. Per-test analysis still uses the local Vitest/Jest binary directly so `overlapped` can run one test file and one test name at a time.
+The exception is reference coverage: `--reference-command`, or the exact `test:integration` script convention, is only for generating baseline coverage. Per-test analysis still uses the local Vitest/Jest binary directly so `overlapped` can run one test file and one test name at a time.
 
 ## Usage
 
@@ -124,6 +126,7 @@ Always review changes with `--dry-run` first.
 | `--reference-coverage <path>` | Path to existing `coverage-final.json` | — |
 | `--unit <name>` | Unit test suite project or config name | — |
 | `--include <glob>` | Unit test file pattern (repeatable) | common `src/`, `test/`, and `tests/` `.test.ts` / `.spec.ts` patterns |
+| `--exclude <glob>` | Unit test file pattern to exclude | common `.integration.*` and `.e2e.*` patterns |
 | `--concurrency <n>` | Parallel test runs | `8` |
 | `--report <path>` | Report output path | `overlapped-report.json` |
 | `--dry-run` | Preview prune without modifying files | `false` |

@@ -37,6 +37,7 @@ export interface OverlappedConfig {
   referenceCoverage?: string;
   unitProject?: string;
   unitInclude: string[];
+  unitExclude: string[];
   concurrency: number;
   reportPath: string;
 }

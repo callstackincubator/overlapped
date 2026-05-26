@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 import fs from 'node:fs';
+import path from 'node:path';
 import type { OverlappedConfig } from './types.js';
 import { detectRunner } from './runner.js';
 import { analyze } from './analyzer.js';
@@ -15,6 +16,13 @@ const DEFAULT_UNIT_INCLUDE = [
   'tests/**/*.spec.ts',
 ];
 
+const DEFAULT_UNIT_EXCLUDE = [
+  '**/*.integration.test.ts',
+  '**/*.integration.spec.ts',
+  '**/*.e2e.test.ts',
+  '**/*.e2e.spec.ts',
+];
+
 const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is fully subsumed by integration tests
 
 \x1b[1mUsage:\x1b[0m
@@ -28,6 +36,7 @@ const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is ful
   --reference-coverage <path>     Path to a pre-generated coverage-final.json
   --unit <name>                   Unit test suite project/config name
   --include <glob>                Unit test file pattern (repeatable)
+  --exclude <glob>                Unit test file pattern to exclude
   --concurrency <n>               Parallel test runs (default: 8)
   --report <path>                 Report path (default: overlapped-report.json)
   --dry-run                       Show what would be removed without modifying files
@@ -46,6 +55,7 @@ function main(): void {
         'reference-coverage': { type: 'string' },
         unit: { type: 'string' },
         include: { type: 'string', multiple: true },
+        exclude: { type: 'string', multiple: true },
         concurrency: { type: 'string' },
         report: { type: 'string' },
         'dry-run': { type: 'boolean', default: false },
@@ -98,24 +108,75 @@ function buildConfig(
     'reference-coverage'?: string;
     unit?: string;
     include?: string[];
+    exclude?: string[];
     concurrency?: string;
     report?: string;
   },
   cwd: string,
 ): OverlappedConfig {
+  const runner = parseRunner(values.runner, cwd);
+  const scripts = readPackageScripts(cwd);
+  const referenceCommand =
+    values['reference-command'] ??
+    inferReferenceCommand(
+      scripts,
+      runner,
+      values.reference,
+      values['reference-coverage'],
+    );
+
   const config = {
-    runner: parseRunner(values.runner, cwd),
+    runner,
     referenceProject: values.reference,
-    referenceCommand: values['reference-command'],
+    referenceCommand,
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
     unitInclude: values.include ?? DEFAULT_UNIT_INCLUDE,
+    unitExclude: values.exclude ?? DEFAULT_UNIT_EXCLUDE,
     concurrency: parseInt(values.concurrency ?? '8', 10),
     reportPath: values.report ?? 'overlapped-report.json',
   };
 
   validateConfig(config);
   return config;
+}
+
+function readPackageScripts(cwd: string): Record<string, string> {
+  const pkgPath = path.join(cwd, 'package.json');
+  if (!fs.existsSync(pkgPath)) return {};
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  return pkg.scripts ?? {};
+}
+
+function inferReferenceCommand(
+  scripts: Record<string, string>,
+  runner: 'vitest' | 'jest',
+  referenceProject: string | undefined,
+  referenceCoverage: string | undefined,
+): string | undefined {
+  if (referenceProject || referenceCoverage) return undefined;
+
+  const script = scripts['test:integration'];
+  if (!script) return undefined;
+
+  const coverageArgs = runner === 'vitest'
+    ? [
+        '--coverage',
+        '--coverage.reporter=json',
+        '--coverage.reportsDirectory="$OVERLAPPED_COVERAGE_DIR"',
+        '--coverage.all=false',
+        '--coverage.thresholds.lines=0',
+        '--coverage.thresholds.statements=0',
+        '--coverage.reportOnFailure',
+      ]
+    : [
+        '--coverage',
+        '--coverageReporters=json',
+        '--coverageDirectory="$OVERLAPPED_COVERAGE_DIR"',
+        '--forceExit',
+      ];
+
+  return `${script} ${coverageArgs.join(' ')}`;
 }
 
 function validateConfig(config: OverlappedConfig): void {
