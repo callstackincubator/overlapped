@@ -80,7 +80,7 @@ export function writeReport(report: Report, outputPath: string): void {
 }
 
 export function printSummary(report: Report): void {
-  console.log('\n\x1b[1m=== ovelapped ===\x1b[0m\n');
+  console.log('\n\x1b[1m=== overlapped ===\x1b[0m\n');
   console.log(`Total tests analyzed: ${report.totalTests}`);
   console.log(
     `Subsumed (safe to remove): \x1b[33m${report.subsumedTests}\x1b[0m`,

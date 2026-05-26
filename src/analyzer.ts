@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AnalysisResult, OvelappedConfig, TestEntry } from './types.js';
+import type { AnalysisResult, OverlappedConfig, TestEntry } from './types.js';
 import {
   loadCoverageMap,
   loadCoverageFile,
@@ -11,7 +11,7 @@ import { extractTests } from './extractor.js';
 import { runCoverage } from './runner.js';
 
 export async function analyze(
-  config: OvelappedConfig,
+  config: OverlappedConfig,
   cwd: string,
 ): Promise<AnalysisResult[]> {
   // Phase 1: Load or generate reference coverage
@@ -22,7 +22,7 @@ export async function analyze(
     const refMap = loadCoverageFile(path.resolve(cwd, config.referenceCoverage));
     refFp = buildFingerprint(refMap);
   } else {
-    const refCoverageDir = path.join(cwd, '.ovelapped', 'reference');
+    const refCoverageDir = path.join(cwd, '.overlapped', 'reference');
     fs.mkdirSync(refCoverageDir, { recursive: true });
 
     process.stderr.write('Running reference suite with coverage...\n');
@@ -85,7 +85,7 @@ export async function analyze(
     const batch = allTests.slice(i, i + concurrency);
     const promises = batch.map(async (test, batchIdx) => {
       const idx = i + batchIdx;
-      const covDir = path.join(cwd, '.ovelapped', `test-${idx}`);
+      const covDir = path.join(cwd, '.overlapped', `test-${idx}`);
       fs.mkdirSync(covDir, { recursive: true });
 
       try {
@@ -158,7 +158,7 @@ export async function analyze(
   }
 
   // Cleanup
-  fs.rmSync(path.join(cwd, '.ovelapped'), { recursive: true, force: true });
+  fs.rmSync(path.join(cwd, '.overlapped'), { recursive: true, force: true });
 
   return results;
 }

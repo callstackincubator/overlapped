@@ -8,7 +8,7 @@ export function detectRunner(cwd: string): Runner {
   const pkgPath = path.join(cwd, 'package.json');
   if (!fs.existsSync(pkgPath)) {
     throw new Error(
-      `No package.json found in ${cwd}.\nRun ovelapped from your project root.`,
+      `No package.json found in ${cwd}.\nRun overlapped from your project root.`,
     );
   }
 

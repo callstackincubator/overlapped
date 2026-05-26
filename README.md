@@ -1,10 +1,10 @@
-# ovelapped
+# overlapped
 
 Find the unit tests your AI agent wrote twice.
 
 ## Overview
 
-`ovelapped` finds unit tests that add no coverage beyond a reference suite, such as integration, e2e, or provider tests.
+`overlapped` finds unit tests that add no coverage beyond a reference suite, such as integration, e2e, or provider tests.
 
 It runs each candidate unit test in isolation, compares its statement and branch coverage against the reference coverage, and reports tests that cover nothing new.
 
@@ -14,7 +14,7 @@ Supports **vitest** and **jest** out of the box. The runner is auto-detected fro
 
 ## Real-World Cleanup
 
-In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `ovelapped` audited a large AI-assisted unit suite against provider-integration coverage.
+In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `overlapped` audited a large AI-assisted unit suite against provider-integration coverage.
 
 | Metric | Before | After |
 |---|---:|---:|
@@ -34,22 +34,22 @@ Every removed test covered only statements and branches that the integration sui
 Compare a unit suite against the suite that already gives you confidence:
 
 ```bash
-npx ovelapped analyze \
+npx overlapped analyze \
   --reference integration \
   --unit unit \
   --include "src/**/*.test.ts"
 ```
 
-Review `ovelapped-report.json`, then preview removals:
+Review `overlapped-report.json`, then preview removals:
 
 ```bash
-npx ovelapped prune --dry-run
+npx overlapped prune --dry-run
 ```
 
 Apply the cleanup when the preview looks right:
 
 ```bash
-npx ovelapped prune
+npx overlapped prune
 ```
 
 Then run your full test suite with coverage and confirm thresholds still pass.
@@ -59,7 +59,7 @@ Then run your full test suite with coverage and confirm thresholds still pass.
 Vitest workspace with named projects, like the agent-device cleanup:
 
 ```bash
-npx ovelapped analyze \
+npx overlapped analyze \
   --runner vitest \
   --reference provider-integration \
   --unit unit \
@@ -69,7 +69,7 @@ npx ovelapped analyze \
 Existing reference coverage:
 
 ```bash
-npx ovelapped analyze \
+npx overlapped analyze \
   --reference-coverage ./coverage/coverage-final.json
 ```
 
@@ -81,11 +81,11 @@ npx ovelapped analyze \
 
 ## Usage
 
-### `ovelapped analyze`
+### `overlapped analyze`
 
 Builds the redundancy report. Use `--reference` for the suite that acts as the coverage baseline, and `--unit` for the suite containing candidate tests to remove.
 
-### `ovelapped prune`
+### `overlapped prune`
 
 Reads the report and removes redundant tests. Files where every test is redundant are deleted entirely; mixed files get individual test blocks removed.
 
@@ -101,7 +101,7 @@ Always review changes with `--dry-run` first.
 | `--unit <name>` | Unit test suite project or config name | — |
 | `--include <glob>` | Unit test file pattern (repeatable) | `src/**/*.test.ts` |
 | `--concurrency <n>` | Parallel test runs | `8` |
-| `--report <path>` | Report output path | `ovelapped-report.json` |
+| `--report <path>` | Report output path | `overlapped-report.json` |
 | `--dry-run` | Preview prune without modifying files | `false` |
 
 ## How It Works
@@ -118,8 +118,8 @@ MIT
 
 ## Made at Callstack
 
-`ovelapped` is an open source project and will always remain free to use. The project has been developed in close partnership with [Callstack](https://callstack.com/?utm_source=github.com&utm_medium=referral&utm_campaign=ovelapped&utm_term=readme), and contributed to the React Native Community.
+`overlapped` is an open source project and will always remain free to use. The project has been developed in close partnership with [Callstack](https://callstack.com/), and contributed to the React Native Community.
 
-Callstack is a group of React and React Native experts. If you need help with these or want to say hi, contact us at [callstack.com](https://callstack.com/?utm_source=github.com&utm_medium=referral&utm_campaign=ovelapped&utm_term=readme).
+Callstack is a group of React and React Native experts. If you need help with these or want to say hi, contact us at [callstack.com](https://callstack.com/).
 
-Like the project? [Join the Callstack team](https://callstack.com/careers/?utm_source=github.com&utm_medium=referral&utm_campaign=ovelapped&utm_term=readme) who does amazing stuff for clients and drives React Native Open Source!
+Like the project? [Join the Callstack team](https://callstack.com/careers/) who does amazing stuff for clients and drives React Native Open Source!

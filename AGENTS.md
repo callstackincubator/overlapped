@@ -33,8 +33,8 @@ Minimal operating guide for AI coding agents in this repo.
 - For docs-only changes, no validation is required.
 - For TypeScript changes, run `npm run build`.
 - For behavior changes, manually validate against a real project using Vitest or Jest:
-  - `ovelapped analyze --runner vitest ...`
-  - `ovelapped analyze --runner jest ...`
+  - `overlapped analyze --runner vitest ...`
+  - `overlapped analyze --runner jest ...`
 - Validate both runners when changing runner detection, runner command construction, coverage handling, extraction, or pruning.
 
 ## Hard Rules
@@ -46,7 +46,7 @@ Minimal operating guide for AI coding agents in this repo.
 - Do not make pruning depend on formatter output.
 
 ## Key Files
-- `bin/ovelapped.mjs`: Node executable shim that imports the built CLI.
+- `bin/overlapped.mjs`: Node executable shim that imports the built CLI.
 - `src/cli.ts`: argument parsing, command dispatch, analyze/prune orchestration.
 - `src/index.ts`: public API barrel exports.
 - `src/analyzer.ts`: coverage analysis pipeline and per-test subsumption checks.

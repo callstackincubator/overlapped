@@ -1,16 +1,16 @@
 import { parseArgs } from 'node:util';
 import fs from 'node:fs';
-import type { OvelappedConfig } from './types.js';
+import type { OverlappedConfig } from './types.js';
 import { detectRunner } from './runner.js';
 import { analyze } from './analyzer.js';
 import { buildReport, writeReport, printSummary } from './reporter.js';
 import { pruneTests } from './pruner.js';
 
-const HELP = `\x1b[1movelapped\x1b[0m — find unit tests whose coverage is fully subsumed by integration tests
+const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is fully subsumed by integration tests
 
 \x1b[1mUsage:\x1b[0m
-  ovelapped analyze [options]    Run coverage analysis
-  ovelapped prune   [options]    Remove redundant tests from source files
+  overlapped analyze [options]    Run coverage analysis
+  overlapped prune   [options]    Remove redundant tests from source files
 
 \x1b[1mOptions:\x1b[0m
   --runner <vitest|jest>          Test runner (auto-detected by default)
@@ -19,7 +19,7 @@ const HELP = `\x1b[1movelapped\x1b[0m — find unit tests whose coverage is full
   --unit <name>                   Unit test suite project/config name
   --include <glob>                Unit test file pattern (default: src/**/*.test.ts)
   --concurrency <n>               Parallel test runs (default: 8)
-  --report <path>                 Report path (default: ovelapped-report.json)
+  --report <path>                 Report path (default: overlapped-report.json)
   --dry-run                       Show what would be removed without modifying files
   --help                          Show this help
   --version                       Show version
@@ -58,14 +58,14 @@ function main(): void {
   const command = positionals[0];
   const cwd = process.cwd();
 
-  const config: OvelappedConfig = {
+  const config: OverlappedConfig = {
     runner: (values.runner as 'vitest' | 'jest') ?? detectRunner(cwd),
     referenceProject: values.reference,
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
     unitInclude: values.include ?? ['src/**/*.test.ts'],
     concurrency: parseInt(values.concurrency ?? '8', 10),
-    reportPath: values.report ?? 'ovelapped-report.json',
+    reportPath: values.report ?? 'overlapped-report.json',
   };
 
   if (command === 'analyze') {
@@ -80,7 +80,7 @@ function main(): void {
 }
 
 async function runAnalyze(
-  config: OvelappedConfig,
+  config: OverlappedConfig,
   cwd: string,
 ): Promise<void> {
   try {
@@ -96,12 +96,12 @@ async function runAnalyze(
 }
 
 async function runPrune(
-  config: OvelappedConfig,
+  config: OverlappedConfig,
   dryRun: boolean,
 ): Promise<void> {
   if (!fs.existsSync(config.reportPath)) {
     console.error(
-      `Report not found: ${config.reportPath}\nRun \`ovelapped analyze\` first.`,
+      `Report not found: ${config.reportPath}\nRun \`overlapped analyze\` first.`,
     );
     process.exitCode = 1;
     return;

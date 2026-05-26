@@ -5,7 +5,7 @@ export { extractTests } from './extractor.js';
 export { loadCoverageMap, loadCoverageFile, buildFingerprint, checkSubsumption } from './coverage.js';
 export { detectRunner } from './runner.js';
 export type {
-  OvelappedConfig,
+  OverlappedConfig,
   AnalysisResult,
   TestEntry,
   CoverageMap,

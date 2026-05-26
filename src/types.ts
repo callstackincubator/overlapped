@@ -30,7 +30,7 @@ export interface AnalysisResult {
 
 export type Runner = 'vitest' | 'jest';
 
-export interface OvelappedConfig {
+export interface OverlappedConfig {
   runner: Runner;
   referenceProject?: string;
   referenceCoverage?: string;
