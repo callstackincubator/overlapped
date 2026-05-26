@@ -10,13 +10,36 @@
 
 Find unit tests whose coverage is fully subsumed by integration tests.
 
+Find the unit tests your AI agent wrote twice.
+
 ## Overview
 
 `ovelapped` analyzes your test suite to find unit tests that don't cover anything your integration tests don't already cover. It runs each unit test in isolation, compares its coverage fingerprint against a reference suite (e.g. integration or e2e tests), and reports which tests are redundant.
 
 Supports **vitest** and **jest** out of the box — the runner is auto-detected from your project dependencies.
 
+Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep only the tests that add coverage signal.
+
+## Real-World Cleanup
+
+In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `ovelapped` was used to audit a large AI-assisted test suite against provider-integration coverage.
+
+| Metric | Before | After |
+|---|---:|---:|
+| Unit tests | 1,831 | 1,723 |
+| Redundant tests removed | — | 151 |
+| Fully redundant files deleted | — | 8 |
+| Files with individual tests removed | — | 54 |
+| Test code removed | — | 2,598 lines |
+| Statement coverage | 82.4% | 82.41% |
+| Branch coverage | 71.94% | 71.96% |
+| Line coverage | 84.49% | 84.5% |
+
+The important bit: all removed tests covered only statements and branches already covered by integration tests. The suite got smaller without losing coverage.
+
 ## Quick Start
+
+Compare default unit tests against a reference suite:
 
 ```bash
 npx ovelapped analyze
@@ -36,6 +59,24 @@ npx ovelapped prune --dry-run    # preview changes
 npx ovelapped prune              # apply changes
 ```
 
+For a Vitest workspace with named projects, like the agent-device cleanup:
+
+```bash
+npx ovelapped analyze \
+  --runner vitest \
+  --reference provider-integration \
+  --unit unit \
+  --include "src/**/*.test.ts"
+```
+
+Recommended cleanup loop:
+
+1. Run `ovelapped analyze`.
+2. Review `ovelapped-report.json`.
+3. Run `ovelapped prune --dry-run`.
+4. Apply with `ovelapped prune`.
+5. Run your full test suite with coverage and confirm thresholds still pass.
+
 ## Prerequisites
 
 - **Node.js >= 22**
@@ -47,6 +88,8 @@ npx ovelapped prune              # apply changes
 ### `ovelapped analyze`
 
 Runs the full analysis. By default it executes your reference suite to generate coverage, then runs each discovered unit test individually.
+
+Use `--reference` for the integration, e2e, or provider suite that should act as the coverage baseline. Use `--unit` for the suite containing candidate tests to remove.
 
 If you already have a `coverage-final.json` from a prior run, skip the reference suite:
 
