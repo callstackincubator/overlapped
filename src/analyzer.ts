@@ -184,6 +184,13 @@ function coverageFailureHint(
     );
   }
 
+  if (stderr.includes('BaseCoverageProvider')) {
+    lines.push(
+      '  - Your Vitest coverage provider appears to be version-mismatched.',
+      '    Keep vitest and @vitest/coverage-v8 on the same major version.',
+    );
+  }
+
   lines.push(
     '  - For Vitest, install/configure a coverage provider such as @vitest/coverage-v8.',
     '  - For Jest, make sure coverage can run and produce coverage-final.json.',
