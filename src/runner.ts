@@ -40,7 +40,7 @@ export function detectRunner(cwd: string): Runner {
   );
 }
 
-function resolveRunnerBin(runner: Runner, cwd: string): string {
+export function resolveRunnerBin(runner: Runner, cwd: string): string {
   const searched: string[] = [];
   for (const dir of getSearchDirs(cwd)) {
     const binPath = path.join(dir, 'node_modules', '.bin', runner);

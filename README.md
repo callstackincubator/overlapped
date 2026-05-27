@@ -2,6 +2,14 @@
 
 Find the unit tests your AI agent wrote twice.
 
+`overlapped` finds unit tests whose statement and branch coverage is already covered by a baseline suite, usually integration, e2e, or provider tests.
+
+It runs each candidate unit test in isolation, compares its coverage against the baseline, and reports tests that are candidates to remove.
+
+Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep the tests that still carry signal.
+
+Supports **Vitest** and **Jest** out of the box. The runner is auto-detected from your project dependencies.
+
 ## Quick Start
 
 1. Split your test scripts into unit tests and integration tests:
@@ -15,12 +23,12 @@ Find the unit tests your AI agent wrote twice.
 }
 ```
 
-`overlapped` uses the exact `test:integration` script as the integration baseline. The `test:unit` script keeps the split obvious for humans and CI; candidate unit tests are discovered from common `*.test.ts` and `*.spec.ts` files.
+`overlapped` uses `test:integration` and `test:unit` as conventions for zero-config runs.
 
 2. Run the analyzer:
 
 ```bash
-overlapped analyze
+npx overlapped analyze
 ```
 
 Example output:
@@ -57,84 +65,37 @@ npx overlapped prune
 
 Then run your full test suite with coverage and confirm thresholds still pass.
 
-`overlapped analyze` discovers candidate unit tests from Jest/Vitest-style `*.test.*` and `*.spec.*` files, excluding `.integration.*` and `.e2e.*` files.
+`overlapped analyze` uses `test:integration` for baseline coverage and `test:unit` to scope candidate unit tests.
 
 Treat the report as a review queue, not an instruction to delete blindly. A test can have a fully overlapped or empty coverage fingerprint and still protect a useful contract, such as package exports, config shape, generated files, or release metadata.
 
-## Overview
+## How It Works
 
-`overlapped` finds unit tests whose statement and branch coverage is 100% overlapped by a baseline suite, usually integration, e2e, or provider tests.
-
-It runs each candidate unit test in isolation, compares its statement and branch coverage against the baseline coverage, and reports tests that are candidates to remove.
-
-In the CLI, that baseline is called the **reference suite** because it can be integration tests, e2e tests, provider tests, or an existing Istanbul `coverage-final.json`.
-
-Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep the tests that still carry signal.
-
-Supports **Vitest** and **Jest** out of the box. The runner is auto-detected from your project dependencies.
-
-## Real-World Cleanup
-
-In [callstackincubator/agent-device#595](https://github.com/callstackincubator/agent-device/pull/595), `overlapped` audited a large AI-assisted unit suite against provider-integration coverage.
-
-| Metric | Before | After |
-|---|---:|---:|
-| Unit tests | 1,831 | 1,723 |
-| 100% overlapped tests removed | — | 151 |
-| Fully overlapped files deleted | — | 8 |
-| Files with individual tests removed | — | 54 |
-| Test code removed | — | 2,598 lines |
-| Statement coverage | 82.4% | 82.41% |
-| Branch coverage | 71.94% | 71.96% |
-| Line coverage | 84.49% | 84.5% |
-
-Every removed test covered only statements and branches that the integration suite already covered. The report identified candidates; humans still reviewed whether any test guarded a contract that coverage could not see.
-
-## Common Setups
-
-Vitest or Jest workspace with named projects, like the agent-device cleanup:
-
-```bash
-npx overlapped analyze \
-  --runner vitest \
-  --reference provider-integration \
-  --unit unit \
-  --include "src/**/*.test.ts"
+```mermaid
+flowchart TD
+  A[Integration baseline] --> B[coverage-final.json]
+  C[Candidate unit tests] --> D[Run each test alone with coverage]
+  D --> E[Per-test coverage fingerprint]
+  B --> F[Compare fingerprints]
+  E --> F
+  F --> G{Fully covered by baseline?}
+  G -->|Yes| H[Removal candidate]
+  G -->|No| I[Keep: unique coverage]
+  H --> J[overlapped-report.json]
+  I --> J
 ```
 
-No project setup, but custom file layout:
+- **Baseline run:** coverage from integration, e2e, provider tests, or an existing Istanbul `coverage-final.json`.
+- **Candidate run:** each unit test runs alone with coverage.
+- **Decision:** if every covered statement and branch from a unit test is already covered by the baseline, it becomes a removal candidate.
 
-```bash
-npx overlapped analyze \
-  --include "packages/*/src/**/*.test.ts" \
-  --exclude "packages/*/src/**/*.integration.test.ts"
-```
+1. Runs or loads Istanbul `coverage-final.json` for the baseline suite.
+2. Runs each candidate unit test in isolation with coverage.
+3. Turns covered statements and branches into fingerprint keys, such as `"/src/foo.ts:s:3"` and `"/src/foo.ts:b:1:0"`.
+4. Marks a test as a removal candidate only when every key in its fingerprint already exists in the baseline fingerprint.
+5. Removes candidate test blocks with bracket matching. No AST, no runtime dependencies.
 
-Existing integration coverage:
-
-```bash
-npx overlapped analyze \
-  --reference-coverage ./coverage/coverage-final.json
-```
-
-pnpm monorepo or custom baseline script:
-
-```bash
-npx overlapped analyze \
-  --reference-command 'pnpm vitest run "test/**/*.integration.test.ts" --coverage --coverage.reporter=json' \
-  --include "test/**/*.test.ts"
-```
-
-If your package has an exact `test:integration` script, `overlapped analyze` uses it automatically as the integration baseline. Similar-looking names such as `test-integration` or `test:e2e` are not guessed.
-
-If your script writes coverage to a fixed path, point `overlapped` at it:
-
-```bash
-npx overlapped analyze \
-  --reference-command "npm run test:coverage" \
-  --reference-coverage ./coverage/integration/coverage-final.json \
-  --include "test/**/*.test.ts"
-```
+For example, `agent-device` used `overlapped` to [drop 151 unnecessary unit tests](https://github.com/callstackincubator/agent-device/pull/595) without losing coverage.
 
 ## Prerequisites
 
@@ -144,15 +105,79 @@ npx overlapped analyze \
 - For Vitest, keep `vitest` and `@vitest/coverage-v8` on the same major version
 - A baseline suite, such as integration or e2e tests, or an existing Istanbul `coverage-final.json`
 
-`overlapped` does not call arbitrary npm scripts. It resolves the local runner binary from the current package or a parent workspace `node_modules/.bin/`, then runs it with coverage flags pointed at a temporary `.overlapped/` directory.
-
-The exception is baseline coverage: `--reference-command`, or the exact `test:integration` script convention, is only for generating baseline coverage. Per-test analysis still uses the local Vitest or Jest binary directly so `overlapped` can run one test file and one test name at a time.
-
 ## Usage
 
 ### `overlapped analyze`
 
-Builds the overlap report. A baseline is required: use `--reference`, `--reference-command`, or `--reference-coverage` for the suite that acts as the coverage baseline. Use `--unit` for the suite containing candidate tests to inspect.
+Builds the overlap report. A baseline is required: use the exact `test:integration` script convention, `--reference`, `--reference-command`, or `--reference-coverage`.
+
+Recommended setup:
+
+```json
+{
+  "scripts": {
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run test/integration"
+  }
+}
+```
+
+```bash
+npx overlapped analyze
+```
+
+`overlapped` adds coverage flags to `test:integration`, then discovers candidate unit tests from normal Jest/Vitest test files. No `--include` or `--exclude` is needed unless your file layout is unusual.
+
+`test:unit` is used to infer candidate scope. For example, `vitest run src` limits candidates to tests under `src/`; `vitest run --project unit` selects the `unit` project.
+
+Named Vitest or Jest projects:
+
+```bash
+npx overlapped analyze \
+  --reference integration \
+  --unit unit
+```
+
+Existing baseline coverage:
+
+```bash
+npx overlapped analyze \
+  --reference-coverage ./coverage/coverage-final.json
+```
+
+Custom baseline command:
+
+```bash
+npx overlapped analyze \
+  --reference-command "pnpm test:integration:coverage"
+```
+
+The command must produce Istanbul `coverage-final.json`, either in `coverage/coverage-final.json` or at the path passed with `--reference-coverage`.
+
+If your script writes coverage to a fixed path, point `overlapped` at it:
+
+```bash
+npx overlapped analyze \
+  --reference-command "npm run test:coverage" \
+  --reference-coverage ./coverage/integration/coverage-final.json
+```
+
+Custom unit test layout:
+
+```bash
+npx overlapped analyze \
+  --include "packages/*/src/**/*.test.ts" \
+  --exclude "packages/*/src/**/*.integration.test.ts"
+```
+
+Similar-looking script names such as `test-integration`, `test:e2e`, or `test:provider` are not guessed. Use `test:integration` for zero-config baseline coverage, or pass `--reference-command`.
+
+Command flow:
+
+- Baseline coverage comes from `test:integration`, `--reference`, `--reference-command`, or `--reference-coverage`.
+- Candidate scope comes from `test:unit`, `--unit`, `--include`, or default Jest/Vitest test file patterns.
+- Candidate tests are checked through the local Vitest or Jest binary, one file and one test name at a time.
+- Runner binaries are resolved from the current package or a parent workspace `node_modules/.bin/`.
 
 ### `overlapped prune`
 
@@ -168,20 +193,12 @@ Always review changes with `--dry-run` first.
 | `--reference <name>` | Reference suite project name | — |
 | `--reference-command <command>` | Command that generates reference coverage | — |
 | `--reference-coverage <path>` | Path to existing `coverage-final.json` | — |
-| `--unit <name>` | Unit test suite project name | — |
-| `--include <glob>` | Unit test file pattern (repeatable) | Jest/Vitest-style `*.test.*` and `*.spec.*` files |
+| `--unit <name>` | Unit test suite project name | inferred from `test:unit`, otherwise — |
+| `--include <glob>` | Unit test file pattern (repeatable) | inferred from `test:unit`, otherwise Jest/Vitest-style `*.test.*` and `*.spec.*` files |
 | `--exclude <glob>` | Unit test file pattern to exclude | common `.integration.*` and `.e2e.*` patterns |
 | `--concurrency <n>` | Parallel test runs | `8` |
 | `--report <path>` | Report output path | `overlapped-report.json` |
 | `--dry-run` | Preview prune without modifying files | `false` |
-
-## How It Works
-
-1. Runs or loads Istanbul `coverage-final.json` for the baseline suite.
-2. Runs each candidate unit test in isolation with coverage.
-3. Turns covered statements and branches into fingerprint keys, such as `"/src/foo.ts:s:3"` and `"/src/foo.ts:b:1:0"`.
-4. Marks a test as a removal candidate only when every key in its fingerprint already exists in the baseline fingerprint.
-5. Removes candidate test blocks with bracket matching. No AST, no runtime dependencies.
 
 ## License
 

@@ -134,10 +134,15 @@ export async function analyze(
 
   // Phase 2: Discover unit tests
   writeSection('2. Candidate unit tests');
-  if (config.unitInclude.length > 0) {
+  writeDetail('source', config.unitSource ?? 'runner default');
+  if (config.unitSource === 'test:unit' && config.unitScope && config.unitScope.length > 0) {
+    writeDetail('scope', config.unitScope.join(', '));
+  } else if (config.unitInclude.length > 0) {
     writeDetail('include', config.unitInclude.join(', '));
   }
-  writeDetail('exclude', config.unitExclude.join(', '));
+  if (config.unitExcludeExplicit) {
+    writeDetail('exclude', config.unitExclude.join(', '));
+  }
 
   const testFiles = findTestFiles(cwd, config.unitInclude, config.unitExclude);
   if (testFiles.length === 0) {
@@ -183,7 +188,10 @@ export async function analyze(
 
   writeSection('3. Per-test coverage checks');
   writeDetail('concurrency', `${concurrency}`);
-  writeDetail('unit source', config.unitProject ? '--unit project' : 'runner default');
+  writeDetail(
+    'unit source',
+    config.unitSource ?? (config.unitProject ? '--unit project' : 'runner default'),
+  );
   writeCommand(unitCommandTemplate, cwd, 'command template');
   writeDetail(
     'note',

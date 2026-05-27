@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AnalysisResult, OverlappedConfig } from './types.js';
 import { detectRunner } from './runner.js';
+import { inferReferenceCommand, inferUnitConfig } from './conventions.js';
 import { analyze } from './analyzer.js';
 import { buildReport, writeReport, printSummary } from './reporter.js';
 import { pruneTests } from './pruner.js';
@@ -126,11 +127,19 @@ function buildConfig(
 ): OverlappedConfig {
   const runner = parseRunner(values.runner, cwd);
   const scripts = readPackageScripts(cwd);
+  const inferredUnit = inferUnitConfig(
+    scripts,
+    runner,
+    cwd,
+    values.unit,
+    values.include,
+  );
   const referenceCommand =
     values['reference-command'] ??
     inferReferenceCommand(
       scripts,
       runner,
+      cwd,
       values.reference,
       values['reference-coverage'],
     );
@@ -147,9 +156,16 @@ function buildConfig(
     referenceCommand,
     referenceCommandSource,
     referenceCoverage: values['reference-coverage'],
-    unitProject: values.unit,
-    unitInclude: values.include ?? DEFAULT_UNIT_INCLUDE,
+    unitProject: values.unit ?? inferredUnit.project,
+    unitSource: values.unit
+      ? '--unit'
+      : values.include
+        ? '--include'
+        : inferredUnit.source,
+    unitScope: inferredUnit.scope,
+    unitInclude: values.include ?? inferredUnit.include ?? DEFAULT_UNIT_INCLUDE,
     unitExclude: values.exclude ?? DEFAULT_UNIT_EXCLUDE,
+    unitExcludeExplicit: values.exclude !== undefined,
     concurrency: parseInt(values.concurrency ?? '8', 10),
     reportPath: values.report ?? 'overlapped-report.json',
   };
@@ -163,35 +179,6 @@ function readPackageScripts(cwd: string): Record<string, string> {
   if (!fs.existsSync(pkgPath)) return {};
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   return pkg.scripts ?? {};
-}
-
-function inferReferenceCommand(
-  scripts: Record<string, string>,
-  runner: 'vitest' | 'jest',
-  referenceProject: string | undefined,
-  referenceCoverage: string | undefined,
-): string | undefined {
-  if (referenceProject || referenceCoverage) return undefined;
-
-  const script = scripts['test:integration'];
-  if (!script) return undefined;
-
-  const coverageArgs = runner === 'vitest'
-    ? [
-        '--coverage',
-        '--coverage.reporter=json',
-        '--coverage.all=false',
-        '--coverage.thresholds.lines=0',
-        '--coverage.thresholds.statements=0',
-        '--coverage.reportOnFailure',
-      ]
-    : [
-        '--coverage',
-        '--coverageReporters=json',
-        '--forceExit',
-      ];
-
-  return `${script} ${coverageArgs.join(' ')}`;
 }
 
 function validateConfig(config: OverlappedConfig): void {

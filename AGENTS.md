@@ -22,6 +22,7 @@ Minimal operating guide for AI coding agents in this repo.
 - Public API exports live in `src/index.ts`.
 - Runner detection and execution live in `src/runner.ts`.
 - Runner binaries must resolve from the target project's `node_modules/.bin/`.
+- Package script conventions such as `test:integration` and `test:unit` live in `src/conventions.ts`.
 - Coverage loading, fingerprinting, and overlap checks live in `src/coverage.ts`.
 - Test extraction in `src/extractor.ts` uses bracket/string matching, not an AST.
 - Test pruning in `src/pruner.ts` uses string manipulation against source files.
@@ -50,6 +51,7 @@ Minimal operating guide for AI coding agents in this repo.
 - `src/cli.ts`: argument parsing, command dispatch, analyze/prune orchestration.
 - `src/index.ts`: public API barrel exports.
 - `src/analyzer.ts`: coverage analysis pipeline and per-test overlap checks.
+- `src/conventions.ts`: zero-config package script conventions and script parsing.
 - `src/runner.ts`: runner detection, binary resolution, coverage command construction.
 - `src/coverage.ts`: Istanbul coverage loading and coverage fingerprint comparison.
 - `src/extractor.ts`: test and `test.each` extraction via source text matching.

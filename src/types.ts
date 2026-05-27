@@ -37,8 +37,11 @@ export interface OverlappedConfig {
   referenceCommandSource?: 'test:integration' | '--reference-command';
   referenceCoverage?: string;
   unitProject?: string;
+  unitSource?: 'test:unit' | '--unit' | '--include';
+  unitScope?: string[];
   unitInclude: string[];
   unitExclude: string[];
+  unitExcludeExplicit: boolean;
   concurrency: number;
   reportPath: string;
 }
