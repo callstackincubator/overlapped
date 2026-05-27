@@ -22,7 +22,7 @@ Minimal operating guide for AI coding agents in this repo.
 - Public API exports live in `src/index.ts`.
 - Runner detection and execution live in `src/runner.ts`.
 - Runner binaries must resolve from the target project's `node_modules/.bin/`.
-- Coverage loading, fingerprinting, and subsumption checks live in `src/coverage.ts`.
+- Coverage loading, fingerprinting, and overlap checks live in `src/coverage.ts`.
 - Test extraction in `src/extractor.ts` uses bracket/string matching, not an AST.
 - Test pruning in `src/pruner.ts` uses string manipulation against source files.
 - Reports are built, written, and printed by `src/reporter.ts`.
@@ -49,11 +49,11 @@ Minimal operating guide for AI coding agents in this repo.
 - `bin/overlapped.mjs`: Node executable shim that imports the built CLI.
 - `src/cli.ts`: argument parsing, command dispatch, analyze/prune orchestration.
 - `src/index.ts`: public API barrel exports.
-- `src/analyzer.ts`: coverage analysis pipeline and per-test subsumption checks.
+- `src/analyzer.ts`: coverage analysis pipeline and per-test overlap checks.
 - `src/runner.ts`: runner detection, binary resolution, coverage command construction.
 - `src/coverage.ts`: Istanbul coverage loading and coverage fingerprint comparison.
 - `src/extractor.ts`: test and `test.each` extraction via source text matching.
-- `src/pruner.ts`: removal of subsumed tests or fully redundant files.
+- `src/pruner.ts`: removal of reported overlap candidates or fully overlapped files.
 - `src/reporter.ts`: JSON report creation, writing, and console summary.
 - `src/types.ts`: shared config, coverage, runner, test, and result types.
 

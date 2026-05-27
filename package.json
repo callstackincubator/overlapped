@@ -1,7 +1,7 @@
 {
   "name": "overlapped",
   "version": "0.1.0",
-  "description": "Find unit tests whose coverage is fully subsumed by integration tests",
+  "description": "Find unit tests with 100% statement and branch overlap",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

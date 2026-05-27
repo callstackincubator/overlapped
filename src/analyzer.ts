@@ -5,7 +5,7 @@ import {
   loadCoverageMap,
   loadCoverageFile,
   buildFingerprint,
-  checkSubsumption,
+  checkOverlap,
 } from './coverage.js';
 import { extractTests } from './extractor.js';
 import { runCommand, runCoverage } from './runner.js';
@@ -148,8 +148,8 @@ export async function analyze(
 
         const testMap = loadCoverageMap(covDir);
         const testFp = buildFingerprint(testMap);
-        const { subsumed, uniqueStatements, uniqueBranches } =
-          checkSubsumption(testFp, refFp);
+        const { overlapped, uniqueStatements, uniqueBranches } =
+          checkOverlap(testFp, refFp);
 
         const totalStatements = [...testFp].filter((k) =>
           k.includes(':s:'),
@@ -160,7 +160,7 @@ export async function analyze(
 
         return {
           test,
-          status: subsumed ? ('subsumed' as const) : ('unique' as const),
+          status: overlapped ? ('overlapped' as const) : ('unique' as const),
           uniqueStatements,
           uniqueBranches,
           totalStatements,
@@ -181,8 +181,8 @@ export async function analyze(
           : r.test.name;
       const fileBase = path.basename(r.test.file);
       const status =
-        r.status === 'subsumed'
-          ? '\x1b[33msubsumed\x1b[0m'
+        r.status === 'overlapped'
+          ? '\x1b[33moverlapped\x1b[0m'
           : r.status === 'error'
             ? '\x1b[31merror\x1b[0m'
             : `\x1b[32munique\x1b[0m (${r.uniqueStatements}s/${r.uniqueBranches}b)`;

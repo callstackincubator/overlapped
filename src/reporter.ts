@@ -5,26 +5,26 @@ import type { AnalysisResult } from './types.js';
 export interface Report {
   timestamp: string;
   totalTests: number;
-  subsumedTests: number;
+  overlappedTests: number;
   uniqueTests: number;
   errorTests: number;
-  fullyRedundantFiles: string[];
-  partiallyRedundantFiles: {
+  fullyOverlappedFiles: string[];
+  partiallyOverlappedFiles: {
     file: string;
-    redundantTests: string[];
+    candidateTests: string[];
     keptTests: string[];
   }[];
   results: {
     file: string;
     name: string;
-    status: string;
+    status: AnalysisResult['status'];
     uniqueStatements: number;
     uniqueBranches: number;
   }[];
 }
 
 export function buildReport(results: AnalysisResult[]): Report {
-  const subsumed = results.filter((r) => r.status === 'subsumed');
+  const overlapped = results.filter(isOverlapCandidate);
   const unique = results.filter((r) => r.status === 'unique');
   const errors = results.filter((r) => r.status === 'error');
 
@@ -35,23 +35,23 @@ export function buildReport(results: AnalysisResult[]): Report {
     byFile.set(r.test.file, existing);
   }
 
-  const fullyRedundantFiles: string[] = [];
-  const partiallyRedundantFiles: Report['partiallyRedundantFiles'] = [];
+  const fullyOverlappedFiles: string[] = [];
+  const partiallyOverlappedFiles: Report['partiallyOverlappedFiles'] = [];
 
   for (const [file, fileResults] of byFile) {
-    const fileSub = fileResults.filter((r) => r.status === 'subsumed');
-    const fileKept = fileResults.filter((r) => r.status !== 'subsumed');
+    const fileOverlapped = fileResults.filter(isOverlapCandidate);
+    const fileKept = fileResults.filter((r) => !isOverlapCandidate(r));
 
-    if (fileSub.length === 0) continue;
+    if (fileOverlapped.length === 0) continue;
 
     const relFile = path.relative(process.cwd(), file);
 
     if (fileKept.length === 0) {
-      fullyRedundantFiles.push(relFile);
+      fullyOverlappedFiles.push(relFile);
     } else {
-      partiallyRedundantFiles.push({
+      partiallyOverlappedFiles.push({
         file: relFile,
-        redundantTests: fileSub.map((r) => r.test.name),
+        candidateTests: fileOverlapped.map((r) => r.test.name),
         keptTests: fileKept.map((r) => r.test.name),
       });
     }
@@ -60,11 +60,11 @@ export function buildReport(results: AnalysisResult[]): Report {
   return {
     timestamp: new Date().toISOString(),
     totalTests: results.length,
-    subsumedTests: subsumed.length,
+    overlappedTests: overlapped.length,
     uniqueTests: unique.length,
     errorTests: errors.length,
-    fullyRedundantFiles,
-    partiallyRedundantFiles,
+    fullyOverlappedFiles,
+    partiallyOverlappedFiles,
     results: results.map((r) => ({
       file: path.relative(process.cwd(), r.test.file),
       name: r.test.name,
@@ -83,32 +83,36 @@ export function printSummary(report: Report): void {
   console.log('\n\x1b[1m=== overlapped ===\x1b[0m\n');
   console.log(`Total tests analyzed: ${report.totalTests}`);
   console.log(
-    `Subsumed (safe to remove): \x1b[33m${report.subsumedTests}\x1b[0m`,
+    `100% overlapped candidates: \x1b[33m${report.overlappedTests}\x1b[0m`,
   );
   console.log(
-    `Unique (must keep): \x1b[32m${report.uniqueTests}\x1b[0m`,
+    `Tests with unique coverage: \x1b[32m${report.uniqueTests}\x1b[0m`,
   );
   if (report.errorTests > 0) {
     console.log(`Errors: \x1b[31m${report.errorTests}\x1b[0m`);
   }
 
-  if (report.fullyRedundantFiles.length > 0) {
+  if (report.fullyOverlappedFiles.length > 0) {
     console.log(
-      `\nFiles to delete entirely (${report.fullyRedundantFiles.length}):`,
+      `\nFiles where every test is a removal candidate (${report.fullyOverlappedFiles.length}):`,
     );
-    for (const f of report.fullyRedundantFiles) {
+    for (const f of report.fullyOverlappedFiles) {
       console.log(`  ${f}`);
     }
   }
 
-  if (report.partiallyRedundantFiles.length > 0) {
+  if (report.partiallyOverlappedFiles.length > 0) {
     console.log(
-      `\nFiles with removable tests (${report.partiallyRedundantFiles.length}):`,
+      `\nFiles with removal candidates (${report.partiallyOverlappedFiles.length}):`,
     );
-    for (const f of report.partiallyRedundantFiles) {
+    for (const f of report.partiallyOverlappedFiles) {
       console.log(
-        `  ${f.file}: ${f.redundantTests.length} to remove, ${f.keptTests.length} to keep`,
+        `  ${f.file}: ${f.candidateTests.length} candidates, ${f.keptTests.length} with unique coverage`,
       );
     }
   }
+}
+
+function isOverlapCandidate(result: AnalysisResult): boolean {
+  return result.status === 'overlapped';
 }

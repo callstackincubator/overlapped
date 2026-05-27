@@ -12,7 +12,6 @@ export function pruneTests(
   results: AnalysisResult[],
   dryRun: boolean,
 ): PruneResult {
-  const subsumed = results.filter((r) => r.status === 'subsumed');
   const byFile = new Map<string, AnalysisResult[]>();
 
   for (const r of results) {
@@ -26,23 +25,22 @@ export function pruneTests(
   let totalTestsRemoved = 0;
 
   for (const [file, fileResults] of byFile) {
-    const fileSubsumed = fileResults.filter((r) => r.status === 'subsumed');
-    const fileKept = fileResults.filter((r) => r.status !== 'subsumed');
+    const fileOverlapped = fileResults.filter(isOverlapCandidate);
+    const fileKept = fileResults.filter((r) => !isOverlapCandidate(r));
 
-    if (fileSubsumed.length === 0) continue;
+    if (fileOverlapped.length === 0) continue;
 
     const relPath = path.relative(process.cwd(), file);
 
     if (fileKept.length === 0) {
-      // All tests subsumed — delete the file
       if (dryRun) {
-        console.log(`  DELETE ${relPath} (${fileSubsumed.length} tests)`);
+        console.log(`  DELETE ${relPath} (${fileOverlapped.length} tests)`);
       } else {
         fs.unlinkSync(file);
-        console.log(`  Deleted ${relPath} (${fileSubsumed.length} tests)`);
+        console.log(`  Deleted ${relPath} (${fileOverlapped.length} tests)`);
       }
       deletedFiles.push(file);
-      totalTestsRemoved += fileSubsumed.length;
+      totalTestsRemoved += fileOverlapped.length;
       continue;
     }
 
@@ -51,7 +49,7 @@ export function pruneTests(
     let removedInFile = 0;
 
     // Sort by offset descending so removals don't shift indices
-    const toRemove = fileSubsumed
+    const toRemove = fileOverlapped
       .map((r) => r.test)
       .sort((a, b) => b.startOffset - a.startOffset);
 
@@ -70,7 +68,7 @@ export function pruneTests(
         console.log(
           `  EDIT ${relPath}: remove ${removedInFile} tests, keep ${fileKept.length}`,
         );
-        for (const r of fileSubsumed) {
+        for (const r of fileOverlapped) {
           const short =
             r.test.name.length > 70
               ? r.test.name.slice(0, 67) + '...'
@@ -93,6 +91,10 @@ export function pruneTests(
   }
 
   return { deletedFiles, editedFiles, totalTestsRemoved };
+}
+
+function isOverlapCandidate(result: AnalysisResult): boolean {
+  return result.status === 'overlapped';
 }
 
 function findTestBlockByName(

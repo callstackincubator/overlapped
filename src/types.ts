@@ -20,7 +20,7 @@ export interface TestEntry {
 
 export interface AnalysisResult {
   test: TestEntry;
-  status: 'subsumed' | 'unique' | 'error';
+  status: 'overlapped' | 'unique' | 'error';
   uniqueStatements: number;
   uniqueBranches: number;
   totalStatements: number;

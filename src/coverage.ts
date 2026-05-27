@@ -42,10 +42,10 @@ export function buildFingerprint(coverageMap: CoverageMap): Set<string> {
   return fp;
 }
 
-export function checkSubsumption(
+export function checkOverlap(
   testFp: Set<string>,
   referenceFp: Set<string>,
-): { subsumed: boolean; uniqueStatements: number; uniqueBranches: number } {
+): { overlapped: boolean; uniqueStatements: number; uniqueBranches: number } {
   let uniqueStatements = 0;
   let uniqueBranches = 0;
 
@@ -57,7 +57,7 @@ export function checkSubsumption(
   }
 
   return {
-    subsumed: uniqueStatements === 0 && uniqueBranches === 0,
+    overlapped: uniqueStatements === 0 && uniqueBranches === 0,
     uniqueStatements,
     uniqueBranches,
   };

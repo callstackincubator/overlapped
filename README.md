@@ -4,9 +4,9 @@ Find the unit tests your AI agent wrote twice.
 
 ## Overview
 
-`overlapped` finds unit tests that add no coverage beyond a reference suite, such as integration, e2e, or provider tests.
+`overlapped` finds unit tests whose statement and branch coverage is 100% overlapped by a reference suite, such as integration, e2e, or provider tests.
 
-It runs each candidate unit test in isolation, compares its statement and branch coverage against the reference coverage, and reports tests that cover nothing new.
+It runs each candidate unit test in isolation, compares its statement and branch coverage against the reference coverage, and reports tests that are candidates to remove.
 
 Use it when a test suite has grown in bulk, especially after AI-assisted test generation, and you want to keep the tests that still carry signal.
 
@@ -19,25 +19,33 @@ In [callstackincubator/agent-device#595](https://github.com/callstackincubator/a
 | Metric | Before | After |
 |---|---:|---:|
 | Unit tests | 1,831 | 1,723 |
-| Redundant tests removed | — | 151 |
-| Fully redundant files deleted | — | 8 |
+| 100% overlapped tests removed | — | 151 |
+| Fully overlapped files deleted | — | 8 |
 | Files with individual tests removed | — | 54 |
 | Test code removed | — | 2,598 lines |
 | Statement coverage | 82.4% | 82.41% |
 | Branch coverage | 71.94% | 71.96% |
 | Line coverage | 84.49% | 84.5% |
 
-Every removed test covered only statements and branches that the integration suite already covered. Smaller suite, same coverage signal.
+Every removed test covered only statements and branches that the integration suite already covered. The report identified candidates; humans still reviewed whether any test guarded a contract that coverage could not see.
 
 ## Quick Start
 
-Compare a unit suite against the suite that already gives you confidence:
+Add a reference script for the tests that already give you confidence:
+
+```json
+{
+  "scripts": {
+    "test:unit": "vitest run src",
+    "test:integration": "vitest run test/integration"
+  }
+}
+```
+
+Then run:
 
 ```bash
-npx overlapped analyze \
-  --reference integration \
-  --unit unit \
-  --include "src/**/*.test.ts"
+npx overlapped analyze
 ```
 
 Review `overlapped-report.json`, then preview removals:
@@ -54,9 +62,13 @@ npx overlapped prune
 
 Then run your full test suite with coverage and confirm thresholds still pass.
 
+`overlapped analyze` automatically uses an exact `test:integration` script as the reference suite. It then discovers candidate unit tests from common `src/`, `test/`, and `tests/` `*.test.ts` / `*.spec.ts` patterns, excluding `.integration.*` and `.e2e.*` files.
+
+Treat the report as a review queue, not an instruction to delete blindly. A test can have a fully overlapped or empty coverage fingerprint and still protect a useful contract, such as package exports, config shape, generated files, or release metadata.
+
 ## Common Setups
 
-Vitest workspace with named projects, like the agent-device cleanup:
+Vitest or Jest workspace with named projects, like the agent-device cleanup:
 
 ```bash
 npx overlapped analyze \
@@ -64,6 +76,14 @@ npx overlapped analyze \
   --reference provider-integration \
   --unit unit \
   --include "src/**/*.test.ts"
+```
+
+No project setup, but custom file layout:
+
+```bash
+npx overlapped analyze \
+  --include "packages/*/src/**/*.test.ts" \
+  --exclude "packages/*/src/**/*.integration.test.ts"
 ```
 
 Existing reference coverage:
@@ -108,11 +128,11 @@ The exception is reference coverage: `--reference-command`, or the exact `test:i
 
 ### `overlapped analyze`
 
-Builds the redundancy report. A reference is required: use `--reference`, `--reference-command`, or `--reference-coverage` for the suite that acts as the coverage baseline. Use `--unit` for the suite containing candidate tests to remove.
+Builds the overlap report. A reference is required: use `--reference`, `--reference-command`, or `--reference-coverage` for the suite that acts as the coverage baseline. Use `--unit` for the suite containing candidate tests to inspect.
 
 ### `overlapped prune`
 
-Reads the report and removes redundant tests. Files where every test is redundant are deleted entirely; mixed files get individual test blocks removed.
+Reads the report and removes reported overlap candidates. Files where every test is a candidate are deleted entirely; mixed files get individual test blocks removed.
 
 Always review changes with `--dry-run` first.
 
@@ -121,10 +141,10 @@ Always review changes with `--dry-run` first.
 | Option | Description | Default |
 |---|---|---|
 | `--runner <vitest\|jest>` | Test runner | auto-detected |
-| `--reference <name>` | Reference suite project or config name | — |
+| `--reference <name>` | Reference suite project name | — |
 | `--reference-command <command>` | Command that generates reference coverage | — |
 | `--reference-coverage <path>` | Path to existing `coverage-final.json` | — |
-| `--unit <name>` | Unit test suite project or config name | — |
+| `--unit <name>` | Unit test suite project name | — |
 | `--include <glob>` | Unit test file pattern (repeatable) | common `src/`, `test/`, and `tests/` `.test.ts` / `.spec.ts` patterns |
 | `--exclude <glob>` | Unit test file pattern to exclude | common `.integration.*` and `.e2e.*` patterns |
 | `--concurrency <n>` | Parallel test runs | `8` |
@@ -136,8 +156,8 @@ Always review changes with `--dry-run` first.
 1. Runs or loads Istanbul `coverage-final.json` for the reference suite.
 2. Runs each candidate unit test in isolation with coverage.
 3. Turns covered statements and branches into fingerprint keys, such as `"/src/foo.ts:s:3"` and `"/src/foo.ts:b:1:0"`.
-4. Marks a test redundant only when every key in its fingerprint already exists in the reference fingerprint.
-5. Removes redundant test blocks with bracket matching. No AST, no runtime dependencies, no guesswork.
+4. Marks a test as a removal candidate only when every key in its fingerprint already exists in the reference fingerprint.
+5. Removes candidate test blocks with bracket matching. No AST, no runtime dependencies.
 
 ## License
 

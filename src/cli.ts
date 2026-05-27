@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { OverlappedConfig } from './types.js';
+import type { AnalysisResult, OverlappedConfig } from './types.js';
 import { detectRunner } from './runner.js';
 import { analyze } from './analyzer.js';
 import { buildReport, writeReport, printSummary } from './reporter.js';
@@ -23,18 +23,18 @@ const DEFAULT_UNIT_EXCLUDE = [
   '**/*.e2e.spec.ts',
 ];
 
-const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests whose coverage is fully subsumed by integration tests
+const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests with 100% statement/branch overlap
 
 \x1b[1mUsage:\x1b[0m
   overlapped analyze [options]    Run coverage analysis
-  overlapped prune   [options]    Remove redundant tests from source files
+  overlapped prune   [options]    Remove reported overlap candidates from source files
 
 \x1b[1mOptions:\x1b[0m
   --runner <vitest|jest>          Test runner (auto-detected by default)
-  --reference <name>              Reference suite project/config name
+  --reference <name>              Reference suite project name
   --reference-command <command>   Command that generates reference coverage
   --reference-coverage <path>     Path to a pre-generated coverage-final.json
-  --unit <name>                   Unit test suite project/config name
+  --unit <name>                   Unit test suite project name
   --include <glob>                Unit test file pattern (repeatable)
   --exclude <glob>                Unit test file pattern to exclude
   --concurrency <n>               Parallel test runs (default: 8)
@@ -250,10 +250,10 @@ async function runPrune(
     (r: {
       file: string;
       name: string;
-      status: string;
+      status: AnalysisResult['status'];
       uniqueStatements: number;
       uniqueBranches: number;
-    }) => ({
+    }): AnalysisResult => ({
       test: {
         file: r.file,
         name: r.name,
@@ -270,7 +270,9 @@ async function runPrune(
   );
 
   console.log(
-    dryRun ? '\nDry run — no files will be modified:\n' : '\nPruning redundant tests:\n',
+    dryRun
+      ? '\nDry run — no files will be modified:\n'
+      : '\nPruning reported overlap candidates:\n',
   );
 
   const { deletedFiles, editedFiles, totalTestsRemoved } = pruneTests(

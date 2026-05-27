@@ -130,7 +130,7 @@ function buildCommand(opts: RunCoverageOptions): string {
   }
 
   const parts = [bin];
-  if (project) parts.push(`--config ${project}`);
+  if (project) parts.push(`--selectProjects ${project}`);
   if (testFile) parts.push(`"${testFile}"`);
   if (testNamePattern) {
     const escaped = escapeTestNameForRegex(testNamePattern);
