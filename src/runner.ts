@@ -100,7 +100,7 @@ interface RunCommandResult {
   error?: Error;
 }
 
-function buildCommand(opts: RunCoverageOptions): string {
+export function buildCoverageCommand(opts: RunCoverageOptions): string {
   const {
     runner,
     cwd,
@@ -144,7 +144,7 @@ function buildCommand(opts: RunCoverageOptions): string {
 }
 
 export function runCoverage(opts: RunCoverageOptions): Promise<RunCoverageResult> {
-  const cmd = buildCommand(opts);
+  const cmd = buildCoverageCommand(opts);
   const timeout = opts.timeout ?? 120_000;
 
   return new Promise((resolve) => {

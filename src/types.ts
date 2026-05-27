@@ -34,6 +34,7 @@ export interface OverlappedConfig {
   runner: Runner;
   referenceProject?: string;
   referenceCommand?: string;
+  referenceCommandSource?: 'test:integration' | '--reference-command';
   referenceCoverage?: string;
   unitProject?: string;
   unitInclude: string[];

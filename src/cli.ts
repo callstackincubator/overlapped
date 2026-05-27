@@ -7,20 +7,30 @@ import { analyze } from './analyzer.js';
 import { buildReport, writeReport, printSummary } from './reporter.js';
 import { pruneTests } from './pruner.js';
 
-const DEFAULT_UNIT_INCLUDE = [
-  'src/**/*.test.ts',
-  'src/**/*.spec.ts',
-  'test/**/*.test.ts',
-  'test/**/*.spec.ts',
-  'tests/**/*.test.ts',
-  'tests/**/*.spec.ts',
-];
+const DEFAULT_UNIT_INCLUDE: string[] = [];
 
 const DEFAULT_UNIT_EXCLUDE = [
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/build/**',
+  '**/coverage/**',
+  '**/.overlapped/**',
   '**/*.integration.test.ts',
+  '**/*.integration.test.tsx',
+  '**/*.integration.test.js',
+  '**/*.integration.test.jsx',
   '**/*.integration.spec.ts',
+  '**/*.integration.spec.tsx',
+  '**/*.integration.spec.js',
+  '**/*.integration.spec.jsx',
   '**/*.e2e.test.ts',
+  '**/*.e2e.test.tsx',
+  '**/*.e2e.test.js',
+  '**/*.e2e.test.jsx',
   '**/*.e2e.spec.ts',
+  '**/*.e2e.spec.tsx',
+  '**/*.e2e.spec.js',
+  '**/*.e2e.spec.jsx',
 ];
 
 const HELP = `\x1b[1moverlapped\x1b[0m — find unit tests with 100% statement/branch overlap
@@ -124,11 +134,18 @@ function buildConfig(
       values.reference,
       values['reference-coverage'],
     );
+  const referenceCommandSource: OverlappedConfig['referenceCommandSource'] =
+    values['reference-command']
+      ? '--reference-command'
+      : referenceCommand
+        ? 'test:integration'
+        : undefined;
 
   const config = {
     runner,
     referenceProject: values.reference,
     referenceCommand,
+    referenceCommandSource,
     referenceCoverage: values['reference-coverage'],
     unitProject: values.unit,
     unitInclude: values.include ?? DEFAULT_UNIT_INCLUDE,
@@ -163,7 +180,6 @@ function inferReferenceCommand(
     ? [
         '--coverage',
         '--coverage.reporter=json',
-        '--coverage.reportsDirectory="$OVERLAPPED_COVERAGE_DIR"',
         '--coverage.all=false',
         '--coverage.thresholds.lines=0',
         '--coverage.thresholds.statements=0',
@@ -172,7 +188,6 @@ function inferReferenceCommand(
     : [
         '--coverage',
         '--coverageReporters=json',
-        '--coverageDirectory="$OVERLAPPED_COVERAGE_DIR"',
         '--forceExit',
       ];
 

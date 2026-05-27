@@ -8,7 +8,36 @@ import {
   checkOverlap,
 } from './coverage.js';
 import { extractTests } from './extractor.js';
-import { runCommand, runCoverage } from './runner.js';
+import { buildCoverageCommand, runCommand, runCoverage } from './runner.js';
+
+const colorsEnabled = process.env.NO_COLOR === undefined;
+const color = {
+  bold: (text: string) => (colorsEnabled ? `\x1b[1m${text}\x1b[0m` : text),
+  dim: (text: string) => (colorsEnabled ? `\x1b[2m${text}\x1b[0m` : text),
+  green: (text: string) => (colorsEnabled ? `\x1b[32m${text}\x1b[0m` : text),
+  yellow: (text: string) => (colorsEnabled ? `\x1b[33m${text}\x1b[0m` : text),
+  red: (text: string) => (colorsEnabled ? `\x1b[31m${text}\x1b[0m` : text),
+  cyan: (text: string) => (colorsEnabled ? `\x1b[36m${text}\x1b[0m` : text),
+};
+
+const DEFAULT_TEST_FILE_PATTERNS = [
+  '**/*.test.ts',
+  '**/*.test.tsx',
+  '**/*.test.js',
+  '**/*.test.jsx',
+  '**/*.test.mts',
+  '**/*.test.cts',
+  '**/*.test.mjs',
+  '**/*.test.cjs',
+  '**/*.spec.ts',
+  '**/*.spec.tsx',
+  '**/*.spec.js',
+  '**/*.spec.jsx',
+  '**/*.spec.mts',
+  '**/*.spec.cts',
+  '**/*.spec.mjs',
+  '**/*.spec.cjs',
+];
 
 export async function analyze(
   config: OverlappedConfig,
@@ -16,12 +45,16 @@ export async function analyze(
 ): Promise<AnalysisResult[]> {
   // Phase 1: Load or generate reference coverage
   let refFp: Set<string>;
+  let refCoverageFileUsed: string;
+
+  writeSection('1. Integration baseline');
 
   if (config.referenceCommand) {
     const refCoverageDir = path.join(cwd, '.overlapped', 'reference');
     fs.mkdirSync(refCoverageDir, { recursive: true });
 
-    process.stderr.write('Running reference command with coverage...\n');
+    writeDetail('source', config.referenceCommandSource ?? 'reference command');
+    writeCommand(config.referenceCommand, cwd);
     const refRun = await runCommand(config.referenceCommand, cwd, {
       OVERLAPPED_COVERAGE_DIR: refCoverageDir,
     });
@@ -49,16 +82,27 @@ export async function analyze(
     }
 
     const refMap = loadCoverageFile(refCoverageFile);
+    refCoverageFileUsed = refCoverageFile;
     refFp = buildFingerprint(refMap);
   } else if (config.referenceCoverage) {
-    process.stderr.write('Loading reference coverage...\n');
-    const refMap = loadCoverageFile(path.resolve(cwd, config.referenceCoverage));
+    const referenceCoverageFile = path.resolve(cwd, config.referenceCoverage);
+    writeDetail('source', '--reference-coverage');
+    writeDetail('file', referenceCoverageFile);
+    const refMap = loadCoverageFile(referenceCoverageFile);
+    refCoverageFileUsed = referenceCoverageFile;
     refFp = buildFingerprint(refMap);
   } else {
     const refCoverageDir = path.join(cwd, '.overlapped', 'reference');
     fs.mkdirSync(refCoverageDir, { recursive: true });
+    const command = buildCoverageCommand({
+      runner: config.runner,
+      cwd,
+      coverageDir: refCoverageDir,
+      project: config.referenceProject,
+    });
 
-    process.stderr.write('Running reference suite with coverage...\n');
+    writeDetail('source', config.referenceProject ? '--reference project' : 'runner default');
+    writeCommand(command, cwd);
     const refRun = await runCoverage({
       runner: config.runner,
       cwd,
@@ -76,22 +120,32 @@ export async function analyze(
     }
 
     const refMap = loadCoverageMap(refCoverageDir);
+    refCoverageFileUsed = path.join(refCoverageDir, 'coverage-final.json');
     refFp = buildFingerprint(refMap);
   }
 
   const refStmts = [...refFp].filter((k) => k.includes(':s:')).length;
   const refBranches = [...refFp].filter((k) => k.includes(':b:')).length;
-  process.stderr.write(
-    `  Reference: ${refStmts} statements, ${refBranches} branches covered.\n`,
+  writeDetail(
+    'coverage',
+    `${color.green(`${refStmts}`)} statements, ${color.green(`${refBranches}`)} branch paths`,
   );
+  writeDetail('coverage file', displayPath(refCoverageFileUsed, cwd));
 
   // Phase 2: Discover unit tests
-  process.stderr.write('\nDiscovering unit tests...\n');
+  writeSection('2. Candidate unit tests');
+  if (config.unitInclude.length > 0) {
+    writeDetail('include', config.unitInclude.join(', '));
+  }
+  writeDetail('exclude', config.unitExclude.join(', '));
 
   const testFiles = findTestFiles(cwd, config.unitInclude, config.unitExclude);
   if (testFiles.length === 0) {
+    const includeDescription = config.unitInclude.length > 0
+      ? config.unitInclude.join(', ')
+      : 'Jest/Vitest-style *.test.* and *.spec.* files';
     throw new Error(
-      `No test files found matching: ${config.unitInclude.join(', ')}\n` +
+      `No test files found matching: ${includeDescription}\n` +
         'Use --include to specify a different pattern.',
     );
   }
@@ -108,13 +162,34 @@ export async function analyze(
     );
   }
 
-  process.stderr.write(
-    `  Found ${allTests.length} tests in ${testFiles.length} files.\n\n`,
+  writeDetail(
+    'found',
+    `${color.green(`${allTests.length}`)} tests in ${color.green(`${testFiles.length}`)} files`,
   );
 
   // Phase 3: Per-test analysis
   const results: AnalysisResult[] = [];
   const concurrency = config.concurrency;
+  const sampleTest = allTests[0]!;
+  const unitCommandTemplate = buildCoverageCommand({
+    runner: config.runner,
+    cwd,
+    coverageDir: path.join(cwd, '.overlapped', 'test-N'),
+    project: config.unitProject,
+    testFile: path.relative(cwd, sampleTest.file),
+    testNamePattern: sampleTest.name,
+    timeout: 60_000,
+  });
+
+  writeSection('3. Per-test coverage checks');
+  writeDetail('concurrency', `${concurrency}`);
+  writeDetail('unit source', config.unitProject ? '--unit project' : 'runner default');
+  writeCommand(unitCommandTemplate, cwd, 'command template');
+  writeDetail(
+    'note',
+    'each candidate swaps in its own test file, test name, and coverage directory',
+  );
+  process.stderr.write('\n');
 
   for (let i = 0; i < allTests.length; i += concurrency) {
     const batch = allTests.slice(i, i + concurrency);
@@ -182,12 +257,12 @@ export async function analyze(
       const fileBase = path.basename(r.test.file);
       const status =
         r.status === 'overlapped'
-          ? '\x1b[33moverlapped\x1b[0m'
+          ? color.yellow('overlapped')
           : r.status === 'error'
-            ? '\x1b[31merror\x1b[0m'
-            : `\x1b[32munique\x1b[0m (${r.uniqueStatements}s/${r.uniqueBranches}b)`;
+            ? color.red('error')
+            : `${color.green('unique')} ${color.dim(`(${r.uniqueStatements}s/${r.uniqueBranches}b)`)}`;
       process.stderr.write(
-        `  [${String(idx).padStart(String(allTests.length).length)}/${allTests.length}] ${status}  ${fileBase} > ${shortName}\n`,
+        `  ${color.dim(`[${String(idx).padStart(String(allTests.length).length)}/${allTests.length}]`)} ${status}  ${color.cyan(fileBase)} ${color.dim('>')} ${shortName}\n`,
       );
     }
   }
@@ -196,6 +271,33 @@ export async function analyze(
   fs.rmSync(path.join(cwd, '.overlapped'), { recursive: true, force: true });
 
   return results;
+}
+
+function writeSection(title: string): void {
+  process.stderr.write(`\n${color.bold(title)}\n`);
+}
+
+function writeDetail(label: string, value: string): void {
+  process.stderr.write(`  ${color.dim(`${label}:`)} ${color.yellow(value)}\n`);
+}
+
+function writeCommand(command: string, cwd: string, label = 'command'): void {
+  process.stderr.write(`  ${color.dim(`${label}:`)}\n`);
+  for (const line of formatCommand(command, cwd)) {
+    process.stderr.write(`    ${color.yellow(line)}\n`);
+  }
+}
+
+function formatCommand(command: string, cwd: string): string[] {
+  const relative = displayPath(command, cwd);
+  return relative
+    .replace(/ && /g, ' &&\n')
+    .replace(/ (?=--[\w.-]+(?:=| |$))/g, '\n  ')
+    .split('\n');
+}
+
+function displayPath(value: string, cwd: string): string {
+  return value.replaceAll(`${cwd}/`, './').replaceAll(cwd, '.');
 }
 
 function findReferenceCoverageFile(
@@ -228,8 +330,8 @@ function referenceCommandHint(
     'Expected coverage file:',
     ...expected,
     '',
-    'When using --reference-command, either:',
-    '  - write coverage to $OVERLAPPED_COVERAGE_DIR/coverage-final.json',
+    'When using --reference-command:',
+    '  - let the runner write coverage/coverage-final.json',
     '  - or pass --reference-coverage <path> pointing at the command output',
   ];
 
@@ -293,7 +395,7 @@ function findTestFiles(
   excludePatterns: string[],
 ): string[] {
   const files: string[] = [];
-  for (const pattern of patterns) {
+  for (const pattern of patterns.length > 0 ? patterns : DEFAULT_TEST_FILE_PATTERNS) {
     const found = fs.globSync(pattern, { cwd });
     files.push(...found.map((f) => path.join(cwd, f)));
   }
