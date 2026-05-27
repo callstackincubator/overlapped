@@ -1,6 +1,6 @@
 {
   "name": "overlapped",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Find unit tests with 100% statement and branch overlap",
   "type": "module",
   "main": "./dist/index.js",
